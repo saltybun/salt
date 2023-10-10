@@ -2,7 +2,8 @@ use std::{collections::HashMap, process::Stdio};
 
 use serde::{Deserialize, Serialize};
 
-static INTRINSICS: [(&str, &str); 3] = [
+static INTRINSICS: [(&str, &str); 4] = [
+    ("init", "Initialize new salt bundle in this directory"),
     ("add", "Adds a salt bundle to your machine"),
     ("sym", "Symlink a folder to add it as a salt bundle"),
     ("watch", "Runs a watcher for the bundle command"),

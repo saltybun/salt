@@ -32,6 +32,8 @@ salt pixel
 
 ### `salt` intrinsics
 
+- `init` - inits a new `salt.json` file in the current directory with example
+  command
 - `add` - adds a bundle to your salt interface
 - `sym` - creates a symlink from the current folder to the bundle location
 - `i` - install the package `VALUE`
