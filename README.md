@@ -33,6 +33,7 @@ salt pixel
 ### `salt` intrinsics
 
 - `add` - adds a bundle to your salt interface
-- `i:{VALUE}` - install the package `VALUE`
-- `watch:{BUNDLE:COMMAND}` - runs the command `salt BUNDLE COMMAND` and watches
-  for file changes in the current directory
+- `sym` - creates a symlink from the current folder to the bundle location
+- `i` - install the package `VALUE`
+- `watch {BUNDLE} {COMMAND}` - runs the command `salt watch BUNDLE COMMAND` and
+  watches for file changes in the current directory
