@@ -3,7 +3,8 @@
 Salt is command line bundler and a command aggregator that lets you define
 bundles of scripts and bring all your scripts under a single command called
 `salt`. The focus of this tool is to seamlessly share scripts between teams and
-improve productivity and ease of use. Bundles lets your quickly import
+improve productivity and ease of use. [Bundles](#salt-bundle) lets your quickly
+import scripts from all around the world.
 
 ## Documentation
 
@@ -11,14 +12,21 @@ improve productivity and ease of use. Bundles lets your quickly import
 - [`salt` quickstart](#salt-quickstart)
 - [`salt` intrinsics](#salt-intrinsics)
 - [`salt.json`](#saltjson)
+  - [root fields](#root)
+  - [command fields](#command)
+- [`salt` bundle](#salt-bundle)
+  - [creating a new bundle](#creating-a-new-bundle)
+  - [marking a folder as bundle](#marking-a-folder-as-bundle)
+  - [updating a bundle](#updating-a-bundle)
 
 ### `salt` use-cases
 
 - Quickly create a CLI with 2 commands `salt init` and `salt sym`
 - Importing scripts from anywhere. If your git repository has `salt.json` it is
   considered as a bundle.
-- CAn be used as a tooling framework for your project/organization.
+- Can be used as a tooling framework for your project/organization.
 - Cross-team scripts collaboration tool
+- No directory/context switching needed
 
 ### `salt` quickstart
 
@@ -45,7 +53,7 @@ salt pixel
 - `init` - inits a new `salt.json` file in the current directory with example
   command
 - `add` - adds a bundle to your salt interface
-- `sym` - creates a symlink from the current folder to the bundle location
+- `mark` - marks the folder as a salt bundle
 - `watch {BUNDLE} {COMMAND}` - runs the command `salt watch BUNDLE COMMAND` and
   watches for file changes in the current directory
 - `i` - install the package `VALUE`
@@ -80,18 +88,66 @@ Here are the list of fields and descriptions of bundle file.
 
 ### root
 
-| Field       | Description                                                  | Type                    |
-| ----------- | ------------------------------------------------------------ | ----------------------- |
-| name        | name of your bundle                                          | string                  |
-| version     | version of your bundle, helps in updating a bundle           | string                  |
-| description | description that is displayed in the help command            | string                  |
-| requires    | defines a dependency on the list of packages for this bundle | List<string>            |
-| commands    | a map of all commands in your bundle                         | Object<string, Command> |
+| Field       | Description                                                  | Type                      |
+| ----------- | ------------------------------------------------------------ | ------------------------- |
+| name        | name of your bundle                                          | string                    |
+| version     | version of your bundle, helps in updating a bundle           | string                    |
+| description | description that is displayed in the help command            | string                    |
+| requires    | defines a dependency on the list of packages for this bundle | `List<string>`            |
+| commands    | a map of all commands in your bundle                         | `Object<string, Command>` |
 
 ### Command
 
-| Field   | Description                                          | Type         |
-| ------- | ---------------------------------------------------- | ------------ |
-| about   | describing the working of this command               | string       |
-| command | the command to invoke on your shell                  | string       |
-| args    | the argument that needs to be passed to this command | List<string> |
+| Field   | Description                                          | Type           |
+| ------- | ---------------------------------------------------- | -------------- |
+| about   | describing the working of this command               | string         |
+| command | the command to invoke on your shell                  | string         |
+| args    | the argument that needs to be passed to this command | `List<string>` |
+
+### `salt` bundle
+
+Salt bundles are a way of sharing your collection of script to another user.
+Bundles are nothing but a git repository or a folder with [salt.json](#saltjson)
+file.
+
+### creating a new bundle
+
+A new bundle can be initialized with the following command.
+
+```sh
+salt init
+```
+
+or pass a folder name with `init` command. If folder does not exists the folder
+will be created for you.
+
+```sh
+salt init mybundle
+```
+
+### marking a folder as bundle
+
+You can create `salt.json` in any folder and use it as a bundle using the `mark`
+command
+
+```sh
+salt mark
+```
+
+or pass a folder name with `mark` command. If folder does not exists it will
+throw an error. `mark` command will fail if it does not find `salt.json` is not
+present.
+
+```sh
+salt mark /Users/codekidx/mybundle
+```
+
+### updating a bundle
+
+If the bundle is added through a git repository (and not marked) the bundler
+will update the repository with the latest commits. To check for updates and
+update to the latest version, you can run the `update` command
+
+```sh
+salt update
+```
