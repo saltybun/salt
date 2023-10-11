@@ -1,12 +1,17 @@
-# 🧂
-
 Salt is command line bundler and a command aggregator that lets you define
 bundles of scripts and bring all your scripts under a single command called
 `salt`. The focus of this tool is to seamlessly share scripts between teams and
-improve productivity and ease of use. [Bundles](#salt-bundle) lets your quickly
-import scripts from all around the world.
+improve productivity with ease of use. [Bundles](#salt-bundle) let your quickly
+import scripts from any folder or a git repository. This project was initially
+created for [🍿](https://github.com/codekidx/popcorn) and was extracted as a
+standalone tool.
 
-## Documentation
+# 🧂
+
+![version](https://img.shields.io/badge/version-v0.1.0-orange)
+![category](https://img.shields.io/badge/beta-teal)
+
+## Getting Started
 
 - [`salt` use-cases](#salt-use-cases)
 - [`salt` quickstart](#salt-quickstart)
@@ -21,12 +26,13 @@ import scripts from all around the world.
 
 ### `salt` use-cases
 
-- Quickly create a CLI with 2 commands `salt init` and `salt sym`
+- Quickly create a CLI with 2 commands `salt init` and `salt mark`
 - Importing scripts from anywhere. If your git repository has `salt.json` it is
   considered as a bundle.
 - Can be used as a tooling framework for your project/organization.
-- Cross-team scripts collaboration tool
+- Cross-team tooling and collaboration
 - No directory/context switching needed
+- Seamless updates of your bundle through `salt update`
 
 ### `salt` quickstart
 
@@ -54,8 +60,8 @@ salt pixel
   command
 - `add` - adds a bundle to your salt interface
 - `mark` - marks the folder as a salt bundle
-- `watch {BUNDLE} {COMMAND}` - runs the command `salt watch BUNDLE COMMAND` and
-  watches for file changes in the current directory
+- `watch {BUNDLE} {COMMAND}` - runs the command from your bundle and restarts
+  the process if directory contents changes
 - `i` - install the package `VALUE`
 
 ### `salt.json`
@@ -94,9 +100,9 @@ Here are the list of fields and descriptions of bundle file.
 | version     | version of your bundle, helps in updating a bundle           | string                    |
 | description | description that is displayed in the help command            | string                    |
 | requires    | defines a dependency on the list of packages for this bundle | `List<string>`            |
-| commands    | a map of all commands in your bundle                         | `Object<string, Command>` |
+| commands    | a map of all commands in your bundle                         | `Object<string, command>` |
 
-### Command
+### command
 
 | Field   | Description                                          | Type           |
 | ------- | ---------------------------------------------------- | -------------- |
