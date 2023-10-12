@@ -86,7 +86,7 @@ This is an example of salt bundle file. This file defines a command for salt
 bundler to read and interpret a bundle called `do` and a command called `ls`.
 The same can be invoked using the followin command:
 
-```sh
+```
 salt do ls
 ```
 
@@ -122,13 +122,6 @@ A new bundle can be initialized with the following command.
 
 ```sh
 salt init
-```
-
-or pass a folder name with `init` command. If folder does not exists the folder
-will be created for you.
-
-```sh
-salt init mybundle
 ```
 
 ### marking a folder as bundle

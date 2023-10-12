@@ -1,12 +1,14 @@
-use std::{collections::HashMap, process::Stdio};
+use std::{collections::HashMap, io::Write, process::Stdio};
 
 use serde::{Deserialize, Serialize};
 
-static INTRINSICS: [(&str, &str); 4] = [
+static INTRINSICS: [(&str, &str); 6] = [
     ("init", "Initialize new salt bundle in this directory"),
     ("add", "Adds a salt bundle to your machine"),
-    ("sym", "Symlink a folder to add it as a salt bundle"),
+    ("update", "Update a salt bundle"),
+    ("mark", "marks a folder as a salt bundle"),
     ("watch", "Runs a watcher for the bundle command"),
+    ("i", "Install a dependency"),
 ];
 
 // Notes:
@@ -26,7 +28,6 @@ struct Command {
 struct SaltBundle {
     pub name: String,
     pub requires: Option<Vec<String>>,
-    pub help: Option<Vec<String>>,
     pub version: String,
     pub description: String,
     pub commands: HashMap<String, Command>,
@@ -55,22 +56,56 @@ fn main() -> std::io::Result<()> {
     let args: Vec<String> = std::env::args().collect();
     if let Some(bundle) = args.get(1) {
         match bundle.as_str() {
+            "init" => init_bundle()?,
             "add" => add_bundle(args.get(2))?,
-            bundle if bundle.starts_with("watch") => start_watcher()?,
-            bundle if bundle.starts_with("i") => install_program()?,
+            "watch" => start_watcher()?,
+            // "i" => install_program()?,
             _ => run_bundle_cmd(&state.bundle_map, bundle.to_owned(), args)?,
         }
     } else {
-        display_salt(&state.bundles);
+        display_salt_help(&state.bundles);
     }
 
     return Ok(());
 }
 
+fn init_bundle() -> std::io::Result<()> {
+    let cwd = std::env::current_dir()?;
+    let bundle_file_path = cwd.join("salt.json");
+    if bundle_file_path.exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::AlreadyExists,
+            "already a salt bundle!",
+        ));
+    }
+
+    let mut sample_commands = HashMap::new();
+    sample_commands.insert(
+        String::from("fp"),
+        Command {
+            about: "prints all file paths in this directory".into(),
+            command: "find".into(),
+            args: vec![".".into()],
+        },
+    );
+    let new_bundle = SaltBundle {
+        name: cwd.file_name().unwrap().to_str().unwrap().to_owned(),
+        requires: Some(vec![]),
+        version: "0.1.0".into(),
+        description: "this is a fresh salt bundle".into(),
+        commands: sample_commands,
+    };
+    let new_bundle_string = serde_json::to_string_pretty::<SaltBundle>(&new_bundle).unwrap();
+    let mut file = std::fs::File::create(bundle_file_path)?;
+    file.write_all(new_bundle_string.as_bytes())?;
+
+    Ok(())
+}
+
 fn run_bundle_cmd(
     bundle_map: &HashMap<String, HashMap<String, Command>>,
     bundle_name: String,
-    _args: Vec<String>,
+    args: Vec<String>,
 ) -> std::io::Result<()> {
     if !bundle_map.contains_key(&bundle_name) {
         return Err(std::io::Error::new(
@@ -78,12 +113,19 @@ fn run_bundle_cmd(
             format!("command: {} not found", bundle_name),
         ));
     }
-    // if let Some(bundle) = args.get(2) {
-
-    // } else {
-    //     display_salt(&state.bundles);
-    // }
-    // let bundle_run_cmd = std::process::Command::new()
+    if let Some(command) = args.get(2) {
+        if let Some(b) = bundle_map.get(&bundle_name) {
+            if let Some(c) = b.get(command.as_str()) {
+                let mut cmd = std::process::Command::new(c.command.clone());
+                cmd.args(c.args.as_slice());
+                cmd.status()?;
+            }
+        }
+        println!("Cannot find command in this bundle");
+    } else {
+        // TODO: display bundle help
+        // display_bundle_help(&state.bundles);
+    }
     Ok(())
 }
 
@@ -170,6 +212,8 @@ fn clone_bundle(link: &str, name: &str) -> std::io::Result<()> {
                 if code == 0 {
                     let bundle_salt_file = bundle_dir.join("salt.json");
                     if !bundle_salt_file.exists() {
+                        // TODO: remove_dir fails if directory is not empty
+                        // fix it!
                         std::fs::remove_dir(bundle_dir)?;
                         // this is not a valid salt bundle
                         return Err(std::io::Error::new(
@@ -205,7 +249,7 @@ fn start_watcher() -> std::io::Result<()> {
     Ok(())
 }
 
-fn install_program() -> std::io::Result<()> {
+fn _install_program() -> std::io::Result<()> {
     Ok(())
 }
 
@@ -226,32 +270,33 @@ fn is_intrinsic_bundle(bundle_name: &str) -> bool {
 }
 
 fn load_current_dir_bundle(state: &mut InterfaceState) -> std::io::Result<()> {
-    let curr_bundle_str = std::fs::read_to_string("./salt.json")?;
-    let curr_bundle = match serde_json::from_str::<SaltBundle>(&curr_bundle_str) {
-        Ok(b) => b,
-        Err(e) => {
-            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e));
+    if let Ok(curr_bundle_str) = std::fs::read_to_string("./salt.json") {
+        let curr_bundle = match serde_json::from_str::<SaltBundle>(&curr_bundle_str) {
+            Ok(b) => b,
+            Err(e) => {
+                return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e));
+            }
+        };
+        if is_intrinsic_bundle(&curr_bundle.name) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                format!("cannot use {}", curr_bundle.name),
+            ));
         }
-    };
-    if is_intrinsic_bundle(&curr_bundle.name) {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Unsupported,
-            format!("cannot use {}", curr_bundle.name),
-        ));
-    }
 
-    if state.bundle_map.contains_key(&curr_bundle.name) {
-        println!(
-            "there is a name conflict for bundle: {} at path: {}",
-            curr_bundle.name, "./salt.json"
-        );
-        return Ok(());
-    }
+        if state.bundle_map.contains_key(&curr_bundle.name) {
+            println!(
+                "there is a name conflict for bundle: {} at path: {}",
+                curr_bundle.name, "./salt.json"
+            );
+            return Ok(());
+        }
 
-    state.bundles.push(curr_bundle.clone());
-    state
-        .bundle_map
-        .insert(curr_bundle.name, curr_bundle.commands);
+        state.bundles.push(curr_bundle.clone());
+        state
+            .bundle_map
+            .insert(curr_bundle.name, curr_bundle.commands);
+    }
 
     Ok(())
 }
@@ -298,7 +343,7 @@ fn load_added_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
     Ok(())
 }
 
-fn display_salt(bundles: &Vec<SaltBundle>) {
+fn display_salt_help(bundles: &Vec<SaltBundle>) {
     let mut help: String = r#" [🧂] gives you superpowers
 version: 0.1.0
 
@@ -310,7 +355,13 @@ Salt commands:
     }
     help.push_str("\nBundle commands:\n");
     for bundle in bundles {
-        help.push_str(format!("{}       - {}\n", bundle.name, bundle.description).as_str());
+        help.push_str(
+            format!(
+                "{} [{}]            - {}\n",
+                bundle.name, bundle.version, bundle.description
+            )
+            .as_str(),
+        );
     }
 
     println!("{}", String::from(help))
