@@ -119,13 +119,13 @@ fn run_bundle_cmd(
                 let mut cmd = std::process::Command::new(c.command.clone());
                 cmd.args(c.args.as_slice());
                 cmd.status()?;
+                return Ok(());
             }
         }
-        println!("Cannot find command in this bundle");
-    } else {
-        // TODO: display bundle help
-        // display_bundle_help(&state.bundles);
     }
+
+    println!("Cannot find command in this bundle, here's something to work with...");
+    display_bundle_command_help(bundle_name.as_str(), bundle_map.get(&bundle_name).unwrap());
     Ok(())
 }
 
@@ -364,5 +364,20 @@ Salt commands:
         );
     }
 
-    println!("{}", String::from(help))
+    println!("{}", help)
+}
+
+fn display_bundle_command_help(name: &str, commands: &HashMap<String, Command>) {
+    let mut help: String = format!(
+        r#"[🧂 Bundle :: {}]
+
+Commands:
+"#,
+        name
+    );
+    for (cmd_name, cmd_info) in commands.iter() {
+        help.push_str(format!("{}            - {}\n", cmd_name, cmd_info.about).as_str());
+    }
+
+    println!("{}", help)
 }
