@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::Write, process::Stdio};
 
 use serde::{Deserialize, Serialize};
 
-static INTRINSICS: [(&str, &str); 6] = [
+const INTRINSICS: [(&str, &str); 6] = [
     ("init", "Initialize new salt bundle in this directory"),
     ("add", "Adds a salt bundle to your machine"),
     ("update", "Update a salt bundle"),
@@ -13,8 +13,6 @@ static INTRINSICS: [(&str, &str); 6] = [
 
 // Notes:
 // pass commonly used settings to devs: SALT_ENV , SALT_ARCH , SALT_OS , SALT_ARGS , SALT_PWD
-// salt prefixes "watch:" can run the command and watch for changes in SALT_PWD
-// salt prefixes "i:{brew}" will install brew in your system provided you are on mac
 // .salt will be the cache directory
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -37,6 +35,12 @@ struct InterfaceState {
     bundles: Vec<SaltBundle>,
     // this is to check if there is bundle conflict
     bundle_map: HashMap<String, HashMap<String, Command>>,
+    config: Option<SaltConfig>,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct SaltConfig {
+    pub marked_paths: Vec<String>,
 }
 
 impl InterfaceState {
@@ -44,6 +48,7 @@ impl InterfaceState {
         Self {
             bundle_map: HashMap::new(),
             bundles: vec![],
+            config: None,
         }
     }
 }
@@ -51,6 +56,7 @@ impl InterfaceState {
 fn main() -> std::io::Result<()> {
     let mut state = InterfaceState::new();
     clear_screen();
+    load_config(&mut state)?;
     load_bundles(&mut state)?;
 
     let args: Vec<String> = std::env::args().collect();
@@ -59,6 +65,7 @@ fn main() -> std::io::Result<()> {
             "init" => init_bundle()?,
             "add" => add_bundle(args.get(2))?,
             "watch" => start_watcher()?,
+            "mark" => mark_as_bundle(state.config)?,
             // "i" => install_program()?,
             _ => run_bundle_cmd(&state.bundle_map, bundle.to_owned(), args)?,
         }
@@ -67,6 +74,51 @@ fn main() -> std::io::Result<()> {
     }
 
     return Ok(());
+}
+
+fn load_config(state: &mut InterfaceState) -> std::io::Result<()> {
+    if let Some(home) = home::home_dir() {
+        let salt_config_path = home.join(".salt").join(".config");
+        if salt_config_path.exists() {
+            if let Ok(config_str) = std::fs::read_to_string(salt_config_path) {
+                let c = serde_json::from_str::<SaltConfig>(&config_str)
+                    .expect("error while reading salt config");
+                state.config = Some(c);
+            }
+        } else {
+            let cfg = SaltConfig {
+                marked_paths: vec![],
+            };
+            write_config(&cfg)?;
+            state.config = Some(cfg);
+        }
+    }
+    Ok(())
+}
+
+fn mark_as_bundle(cfg: Option<SaltConfig>) -> std::io::Result<()> {
+    let cwd = std::env::current_dir()?;
+    if !cwd.join("salt.json").exists() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "not a salt bundle",
+        ));
+    }
+    let mut c = cfg.unwrap();
+    c.marked_paths.push(cwd.to_str().unwrap().into());
+
+    write_config(&c)?;
+    Ok(())
+}
+
+fn write_config(c: &SaltConfig) -> std::io::Result<()> {
+    if let Some(home) = home::home_dir() {
+        let cfg_path = home.join(".salt").join(".config");
+        let mut cfg_file = std::fs::File::create(cfg_path)?;
+        let c = serde_json::to_string(&c).unwrap();
+        cfg_file.write_all(c.as_bytes())?;
+    }
+    Ok(())
 }
 
 fn init_bundle() -> std::io::Result<()> {
@@ -256,6 +308,7 @@ fn _install_program() -> std::io::Result<()> {
 fn load_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
     load_current_dir_bundle(state)?;
     load_added_bundles(state)?;
+    load_marked_bundles(state)?;
 
     Ok(())
 }
@@ -270,6 +323,19 @@ fn is_intrinsic_bundle(bundle_name: &str) -> bool {
 }
 
 fn load_current_dir_bundle(state: &mut InterfaceState) -> std::io::Result<()> {
+    let cwd = std::env::current_dir().unwrap();
+    if let Some(index) = state
+        .config
+        .as_ref()
+        .unwrap()
+        .marked_paths
+        .iter()
+        .position(|x| x == cwd.to_str().unwrap())
+    {
+        // TODO: find a way to do debug logging
+        // println!("current directory is also marked, loading only once");
+        state.config.as_mut().unwrap().marked_paths.remove(index);
+    }
     if let Ok(curr_bundle_str) = std::fs::read_to_string("./salt.json") {
         let curr_bundle = match serde_json::from_str::<SaltBundle>(&curr_bundle_str) {
             Ok(b) => b,
@@ -339,6 +405,41 @@ fn load_added_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
                 state.bundle_map.insert(bundle.name, bundle.commands);
             }
         }
+    }
+    Ok(())
+}
+
+fn load_marked_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
+    for marked in state.config.as_ref().unwrap().marked_paths.iter() {
+        let mpath = std::path::PathBuf::from(marked);
+        if !mpath.join("salt.json").exists() {
+            continue;
+        }
+        let bundle_str = std::fs::read_to_string(mpath.join("salt.json"))
+            .expect("cannot read salt bundle file in marked loader");
+        let bundle = serde_json::from_str::<SaltBundle>(&bundle_str)
+            .expect("unable to parse salt budle in marked loader");
+        // TODO: can be extracted as a function .. the same code is used to
+        // load added bundle and
+        if is_intrinsic_bundle(bundle.name.as_str()) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Unsupported,
+                format!(
+                    "cannot use {} as a bundle name, it is an intrinsic command",
+                    bundle.name
+                ),
+            ));
+        }
+        if state.bundle_map.contains_key(&bundle.name) {
+            println!(
+                "there is a name conflict for bundle: {} at path: {}",
+                bundle.name,
+                mpath.to_str().unwrap()
+            );
+            continue;
+        }
+        state.bundles.push(bundle.clone());
+        state.bundle_map.insert(bundle.name, bundle.commands);
     }
     Ok(())
 }
