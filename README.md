@@ -1,10 +1,10 @@
-Salt is command line bundler and a command aggregator that lets you define
-bundles of scripts and bring all your scripts under a single command called
-`salt`. The focus of this tool is to seamlessly share scripts between teams and
-improve productivity with ease of use. [Bundles](#salt-bundle) let your quickly
-import scripts from any folder or a git repository. This project was initially
-created for [🍿](https://github.com/codekidx/popcorn) and was extracted as a
-standalone tool.
+Salt is command line bundler and a command manager that lets you define bundles
+of scripts and bring all your scripts under a single command called `salt`. The
+focus of this tool is to seamlessly share scripts between teams and improve
+productivity with ease of use. [Bundles](#salt-bundle) let your quickly import
+scripts from any folder or a git repository. This project was initially created
+for [🍿](https://github.com/codekidx/popcorn) and was extracted as a standalone
+tool.
 
 # 🧂
 
@@ -21,12 +21,12 @@ standalone tool.
   - [command fields](#command)
 - [`salt` bundle](#salt-bundle)
   - [creating a new bundle](#creating-a-new-bundle)
-  - [marking a folder as bundle](#marking-a-folder-as-bundle)
+  - [pinning a folder as bundle](#pinning-a-folder-as-bundle)
   - [updating a bundle](#updating-a-bundle)
 
 ### `salt` use-cases
 
-- Quickly create a CLI with 2 commands `salt init` and `salt mark`
+- Quickly create a CLI with 2 commands `salt init` and `salt pin`
 - Importing scripts from anywhere. If your git repository has `salt.json` it is
   considered as a bundle.
 - Can be used as a tooling framework for your project/organization.
@@ -59,7 +59,7 @@ salt pixel
 - `init` - inits a new `salt.json` file in the current directory with example
   command
 - `add` - adds a bundle to your salt interface
-- `mark` - marks the folder as a salt bundle
+- `pin` - pinning the folder as a salt bundle
 - `watch {BUNDLE} {COMMAND}` - runs the command from your bundle and restarts
   the process if directory contents changes
 - `i` - install the package `VALUE`
@@ -124,26 +124,26 @@ A new bundle can be initialized with the following command.
 salt init
 ```
 
-### marking a folder as bundle
+### pinning a folder as bundle
 
-You can create `salt.json` in any folder and use it as a bundle using the `mark`
+You can create `salt.json` in any folder and use it as a bundle using the `pin`
 command
 
 ```sh
-salt mark
+salt pin
 ```
 
-or pass a folder name with `mark` command. If folder does not exists it will
-throw an error. `mark` command will fail if it does not find `salt.json` is not
+or pass a folder name with `pin` command. If folder does not exists it will
+throw an error. `pin` command will fail if it does not find `salt.json` is not
 present.
 
 ```sh
-salt mark /Users/codekidx/mybundle
+salt pin /Users/codekidx/mybundle
 ```
 
 ### updating a bundle
 
-If the bundle is added through a git repository (and not marked) the bundler
+If the bundle is added through a git repository (and not pinned) the bundler
 will update the repository with the latest commits. To check for updates and
 update to the latest version, you can run the `update` command
 

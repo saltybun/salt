@@ -6,10 +6,12 @@ const INTRINSICS: [(&str, &str); 6] = [
     ("init", "Initialize new salt bundle in this directory"),
     ("add", "Adds a salt bundle to your machine"),
     ("update", "Update a salt bundle"),
-    ("mark", "marks a folder as a salt bundle"),
+    ("pin", "pin a folder as a salt bundle"),
     ("watch", "Runs a watcher for the bundle command"),
     ("i", "Install a dependency"),
 ];
+
+type BundleMap = HashMap<String, SaltBundle>;
 
 // Notes:
 // pass commonly used settings to devs: SALT_ENV , SALT_ARCH , SALT_OS , SALT_ARGS , SALT_PWD
@@ -29,18 +31,21 @@ struct SaltBundle {
     pub version: String,
     pub description: String,
     pub commands: HashMap<String, Command>,
+
+    #[serde(skip_serializing, skip_deserializing)]
+    pub is_marked: bool,
 }
 
 struct InterfaceState {
     bundles: Vec<SaltBundle>,
     // this is to check if there is bundle conflict
-    bundle_map: HashMap<String, HashMap<String, Command>>,
+    bundle_map: BundleMap,
     config: Option<SaltConfig>,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
 struct SaltConfig {
-    pub marked_paths: Vec<String>,
+    pub pinned_paths: HashMap<String, String>,
 }
 
 impl InterfaceState {
@@ -65,9 +70,9 @@ fn main() -> std::io::Result<()> {
             "init" => init_bundle()?,
             "add" => add_bundle(args.get(2))?,
             "watch" => start_watcher()?,
-            "mark" => mark_as_bundle(state.config)?,
+            "pin" => pin_bundle(state.config)?,
             // "i" => install_program()?,
-            _ => run_bundle_cmd(&state.bundle_map, bundle.to_owned(), args)?,
+            _ => run_bundle_cmd(&state, bundle.to_owned(), args)?,
         }
     } else {
         display_salt_help(&state.bundles);
@@ -87,7 +92,7 @@ fn load_config(state: &mut InterfaceState) -> std::io::Result<()> {
             }
         } else {
             let cfg = SaltConfig {
-                marked_paths: vec![],
+                pinned_paths: HashMap::new(),
             };
             write_config(&cfg)?;
             state.config = Some(cfg);
@@ -96,7 +101,7 @@ fn load_config(state: &mut InterfaceState) -> std::io::Result<()> {
     Ok(())
 }
 
-fn mark_as_bundle(cfg: Option<SaltConfig>) -> std::io::Result<()> {
+fn pin_bundle(cfg: Option<SaltConfig>) -> std::io::Result<()> {
     let cwd = std::env::current_dir()?;
     if !cwd.join("salt.json").exists() {
         return Err(std::io::Error::new(
@@ -104,10 +109,17 @@ fn mark_as_bundle(cfg: Option<SaltConfig>) -> std::io::Result<()> {
             "not a salt bundle",
         ));
     }
+    let bundle = serde_json::from_str::<SaltBundle>(
+        &std::fs::read_to_string(cwd.join("salt.json")).unwrap(),
+    )
+    .unwrap();
     let mut c = cfg.unwrap();
-    c.marked_paths.push(cwd.to_str().unwrap().into());
+    c.pinned_paths
+        .insert(bundle.name, cwd.to_str().unwrap().into());
 
     write_config(&c)?;
+
+    println!("pinned :: {}", cwd.to_string_lossy());
     Ok(())
 }
 
@@ -146,6 +158,7 @@ fn init_bundle() -> std::io::Result<()> {
         version: "0.1.0".into(),
         description: "this is a fresh salt bundle".into(),
         commands: sample_commands,
+        is_marked: false,
     };
     let new_bundle_string = serde_json::to_string_pretty::<SaltBundle>(&new_bundle).unwrap();
     let mut file = std::fs::File::create(bundle_file_path)?;
@@ -155,19 +168,29 @@ fn init_bundle() -> std::io::Result<()> {
 }
 
 fn run_bundle_cmd(
-    bundle_map: &HashMap<String, HashMap<String, Command>>,
+    state: &InterfaceState,
     bundle_name: String,
     args: Vec<String>,
 ) -> std::io::Result<()> {
-    if !bundle_map.contains_key(&bundle_name) {
+    if !state.bundle_map.contains_key(&bundle_name) {
         return Err(std::io::Error::new(
             std::io::ErrorKind::NotFound,
             format!("command: {} not found", bundle_name),
         ));
     }
     if let Some(command) = args.get(2) {
-        if let Some(b) = bundle_map.get(&bundle_name) {
-            if let Some(c) = b.get(command.as_str()) {
+        if let Some(b) = state.bundle_map.get(&bundle_name) {
+            if let Some(c) = b.commands.get(command.as_str()) {
+                if b.is_marked {
+                    let mbundle_path = state
+                        .config
+                        .as_ref()
+                        .unwrap()
+                        .pinned_paths
+                        .get(&b.name)
+                        .unwrap();
+                    std::env::set_current_dir(mbundle_path)?;
+                }
                 let mut cmd = std::process::Command::new(c.command.clone());
                 cmd.args(c.args.as_slice());
                 cmd.status()?;
@@ -177,7 +200,10 @@ fn run_bundle_cmd(
     }
 
     println!("Cannot find command in this bundle, here's something to work with...");
-    display_bundle_command_help(bundle_name.as_str(), bundle_map.get(&bundle_name).unwrap());
+    display_bundle_command_help(
+        bundle_name.as_str(),
+        state.bundle_map.get(&bundle_name).unwrap(),
+    );
     Ok(())
 }
 
@@ -324,17 +350,21 @@ fn is_intrinsic_bundle(bundle_name: &str) -> bool {
 
 fn load_current_dir_bundle(state: &mut InterfaceState) -> std::io::Result<()> {
     let cwd = std::env::current_dir().unwrap();
-    if let Some(index) = state
-        .config
-        .as_ref()
-        .unwrap()
-        .marked_paths
-        .iter()
-        .position(|x| x == cwd.to_str().unwrap())
-    {
+    let mut marked_key = String::new();
+    for (k, v) in state.config.as_mut().unwrap().pinned_paths.iter() {
+        if v == cwd.to_str().unwrap() {
+            marked_key = k.clone();
+        }
+    }
+    if !marked_key.is_empty() {
         // TODO: find a way to do debug logging
         // println!("current directory is also marked, loading only once");
-        state.config.as_mut().unwrap().marked_paths.remove(index);
+        state
+            .config
+            .as_mut()
+            .unwrap()
+            .pinned_paths
+            .remove_entry(&marked_key);
     }
     if let Ok(curr_bundle_str) = std::fs::read_to_string("./salt.json") {
         let curr_bundle = match serde_json::from_str::<SaltBundle>(&curr_bundle_str) {
@@ -361,7 +391,7 @@ fn load_current_dir_bundle(state: &mut InterfaceState) -> std::io::Result<()> {
         state.bundles.push(curr_bundle.clone());
         state
             .bundle_map
-            .insert(curr_bundle.name, curr_bundle.commands);
+            .insert(curr_bundle.name.clone(), curr_bundle);
     }
 
     Ok(())
@@ -402,7 +432,7 @@ fn load_added_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
                     continue;
                 }
                 state.bundles.push(bundle.clone());
-                state.bundle_map.insert(bundle.name, bundle.commands);
+                state.bundle_map.insert(bundle.name.clone(), bundle);
             }
         }
     }
@@ -410,15 +440,16 @@ fn load_added_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
 }
 
 fn load_marked_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
-    for marked in state.config.as_ref().unwrap().marked_paths.iter() {
-        let mpath = std::path::PathBuf::from(marked);
+    for (_, mpath_str) in state.config.as_ref().unwrap().pinned_paths.iter() {
+        let mpath = std::path::PathBuf::from(mpath_str);
         if !mpath.join("salt.json").exists() {
             continue;
         }
         let bundle_str = std::fs::read_to_string(mpath.join("salt.json"))
             .expect("cannot read salt bundle file in marked loader");
-        let bundle = serde_json::from_str::<SaltBundle>(&bundle_str)
+        let mut bundle = serde_json::from_str::<SaltBundle>(&bundle_str)
             .expect("unable to parse salt budle in marked loader");
+        bundle.is_marked = true;
         // TODO: can be extracted as a function .. the same code is used to
         // load added bundle and
         if is_intrinsic_bundle(bundle.name.as_str()) {
@@ -439,7 +470,7 @@ fn load_marked_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
             continue;
         }
         state.bundles.push(bundle.clone());
-        state.bundle_map.insert(bundle.name, bundle.commands);
+        state.bundle_map.insert(bundle.name.clone(), bundle);
     }
     Ok(())
 }
@@ -458,8 +489,11 @@ Salt commands:
     for bundle in bundles {
         help.push_str(
             format!(
-                "{} [{}]            - {}\n",
-                bundle.name, bundle.version, bundle.description
+                "{} [{}] {}            - {}\n",
+                bundle.name,
+                bundle.version,
+                if bundle.is_marked { "📌" } else { "" },
+                bundle.description
             )
             .as_str(),
         );
@@ -468,7 +502,7 @@ Salt commands:
     println!("{}", help)
 }
 
-fn display_bundle_command_help(name: &str, commands: &HashMap<String, Command>) {
+fn display_bundle_command_help(name: &str, bundle: &SaltBundle) {
     let mut help: String = format!(
         r#"[🧂 Bundle :: {}]
 
@@ -476,7 +510,7 @@ Commands:
 "#,
         name
     );
-    for (cmd_name, cmd_info) in commands.iter() {
+    for (cmd_name, cmd_info) in bundle.commands.iter() {
         help.push_str(format!("{}            - {}\n", cmd_name, cmd_info.about).as_str());
     }
 
