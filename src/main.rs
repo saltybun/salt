@@ -127,8 +127,9 @@ fn main() -> std::io::Result<()> {
                 args.rotate_left(1);
                 start_watcher(&state, args)?
             }
+            "update" => update_bundles()?,
             "pin" => pin_bundle(state.config)?,
-            // "i" => install_program()?,
+            "i" => install_deps()?,
             _ => run_bundle_cmd(&state, bundle.to_owned(), args)?,
         }
     } else {
@@ -136,6 +137,48 @@ fn main() -> std::io::Result<()> {
     }
 
     return Ok(());
+}
+
+fn update_bundles() -> std::io::Result<()> {
+    if let Some(home) = home::home_dir() {
+        let salt_cache_dir = std::path::Path::new(home.to_str().unwrap()).join(".salt");
+        if !salt_cache_dir.exists() {
+            std::fs::create_dir(salt_cache_dir.to_owned())?;
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "no added salt bundles",
+            ));
+        }
+        let paths = std::fs::read_dir(salt_cache_dir.to_owned()).unwrap();
+        for path in paths {
+            let path_dir = path.unwrap();
+            if path_dir.path().is_dir() {
+                std::env::set_current_dir(path_dir.path())?;
+                let mut pull_cmd = std::process::Command::new("git");
+                pull_cmd.args(["pull", "origin", "main"]);
+                match pull_cmd.status()?.code() {
+                    Some(0) => {
+                        println!(
+                            "{} :: updated",
+                            path_dir.path().file_name().unwrap().to_string_lossy()
+                        );
+                    }
+                    _ => {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::Interrupted,
+                            "failed to run pull command",
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn install_deps() -> std::io::Result<()> {
+    println!("install dependencies is unimplemented");
+    Ok(())
 }
 
 fn load_config(state: &mut InterfaceState) -> std::io::Result<()> {
@@ -417,10 +460,6 @@ fn start_watcher(state: &InterfaceState, args: Vec<String>) -> std::io::Result<(
     }
 
     return err;
-}
-
-fn _install_program() -> std::io::Result<()> {
-    Ok(())
 }
 
 fn load_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
