@@ -1,5 +1,7 @@
-use std::{collections::HashMap, io::Write, process::Stdio};
+use std::{collections::HashMap, io::Write, path::PathBuf, process::Stdio, time::Duration};
 
+use notify::Watcher;
+use notify_debouncer_full::new_debouncer;
 use serde::{Deserialize, Serialize};
 
 const INTRINSICS: [(&str, &str); 6] = [
@@ -28,18 +30,24 @@ struct Command {
 struct SaltBundle {
     pub name: String,
     pub requires: Option<Vec<String>>,
+    // TODO: we can exclude some paths from getting notification event
+    // for restart
+    // pub exclude: Vec<String>,
     pub version: String,
     pub description: String,
     pub commands: HashMap<String, Command>,
 
     #[serde(skip_serializing, skip_deserializing)]
-    pub is_marked: bool,
+    pub is_pinned: bool,
+    #[serde(skip_serializing, skip_deserializing)]
+    pub path: PathBuf,
 }
 
 struct InterfaceState {
     bundles: Vec<SaltBundle>,
     // this is to check if there is bundle conflict
     bundle_map: BundleMap,
+    // TDOO: dont keep config as optional
     config: Option<SaltConfig>,
 }
 
@@ -58,18 +66,67 @@ impl InterfaceState {
     }
 }
 
+fn async_debouncer() -> notify::Result<(
+    notify_debouncer_full::Debouncer<notify::FsEventWatcher, notify_debouncer_full::FileIdMap>,
+    std::sync::mpsc::Receiver<
+        Result<Vec<notify_debouncer_full::DebouncedEvent>, Vec<notify::Error>>,
+    >,
+)> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    // TODO: this debouncer duration can be taken from bundle config as well
+    // in key watcher:{ duration: Number(1) }
+    let debouncer = new_debouncer(Duration::from_secs(1), None, tx)?;
+    Ok((debouncer, rx))
+}
+
+async fn async_watch<P: AsRef<std::path::Path>>(command: &Command, path: P) -> notify::Result<()> {
+    println!("Starting to watch: {}", path.as_ref().to_string_lossy());
+    let (mut debouncer, rx) = async_debouncer()?;
+    let mut child;
+    // Add a path to be watched. All files and directories at that path and
+    // below will be monitored for changes.
+    debouncer
+        .watcher()
+        .watch(path.as_ref(), notify::RecursiveMode::Recursive)?;
+    // watcher.watch(path.as_ref(), notify::RecursiveMode::Recursive)?;
+
+    let mut cmd_proc = std::process::Command::new(&command.command);
+    cmd_proc.args(&command.args);
+    child = cmd_proc.spawn().unwrap();
+    println!("starting first: {}", child.id());
+    while let Ok(res) = rx.recv() {
+        match res {
+            Ok(event) => {
+                println!("changed: {:?}", event);
+                println!("killing: {}", child.id());
+                child.kill()?;
+                let mut cmd_proc = std::process::Command::new(&command.command);
+                cmd_proc.args(&command.args);
+                child = cmd_proc.spawn().unwrap();
+                println!("started: {}", child.id());
+            }
+            Err(e) => println!("watch error: {:?}", e),
+        }
+    }
+
+    Ok(())
+}
+
 fn main() -> std::io::Result<()> {
     let mut state = InterfaceState::new();
     clear_screen();
     load_config(&mut state)?;
     load_bundles(&mut state)?;
 
-    let args: Vec<String> = std::env::args().collect();
+    let mut args: Vec<String> = std::env::args().collect();
     if let Some(bundle) = args.get(1) {
         match bundle.as_str() {
             "init" => init_bundle()?,
             "add" => add_bundle(args.get(2))?,
-            "watch" => start_watcher()?,
+            "watch" => {
+                args.rotate_left(1);
+                start_watcher(&state, args)?
+            }
             "pin" => pin_bundle(state.config)?,
             // "i" => install_program()?,
             _ => run_bundle_cmd(&state, bundle.to_owned(), args)?,
@@ -158,7 +215,8 @@ fn init_bundle() -> std::io::Result<()> {
         version: "0.1.0".into(),
         description: "this is a fresh salt bundle".into(),
         commands: sample_commands,
-        is_marked: false,
+        is_pinned: false,
+        path: PathBuf::new(),
     };
     let new_bundle_string = serde_json::to_string_pretty::<SaltBundle>(&new_bundle).unwrap();
     let mut file = std::fs::File::create(bundle_file_path)?;
@@ -181,7 +239,7 @@ fn run_bundle_cmd(
     if let Some(command) = args.get(2) {
         if let Some(b) = state.bundle_map.get(&bundle_name) {
             if let Some(c) = b.commands.get(command.as_str()) {
-                if b.is_marked {
+                if b.is_pinned {
                     let mbundle_path = state
                         .config
                         .as_ref()
@@ -205,6 +263,28 @@ fn run_bundle_cmd(
         state.bundle_map.get(&bundle_name).unwrap(),
     );
     Ok(())
+}
+
+fn run_watch_bundle_cmd(
+    state: &InterfaceState,
+    bundle_name: &String,
+    args: &Vec<String>,
+) -> std::io::Result<()> {
+    if let Some(bundle) = state.bundle_map.get(bundle_name) {
+        if let Some(command) = bundle.commands.get(args.get(2).unwrap()) {
+            futures::executor::block_on(async {
+                if let Err(e) =
+                    async_watch(command, std::path::PathBuf::from(bundle.path.clone())).await
+                {
+                    println!("error: {:?}", e)
+                }
+            });
+        }
+    }
+    Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        "command invalid or not found",
+    ))
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -323,8 +403,20 @@ fn check_or_install_git() -> std::io::Result<()> {
     Ok(())
 }
 
-fn start_watcher() -> std::io::Result<()> {
-    Ok(())
+fn start_watcher(state: &InterfaceState, args: Vec<String>) -> std::io::Result<()> {
+    let args_len = args.len();
+    let err = Err(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        "usage: watch {BUNDLE} {COMMAND}",
+    ));
+    if args_len < 3 {
+        return err;
+    }
+    if let Some(bundle) = args.get(1) {
+        run_watch_bundle_cmd(state, bundle, &args)?;
+    }
+
+    return err;
 }
 
 fn _install_program() -> std::io::Result<()> {
@@ -367,7 +459,7 @@ fn load_current_dir_bundle(state: &mut InterfaceState) -> std::io::Result<()> {
             .remove_entry(&marked_key);
     }
     if let Ok(curr_bundle_str) = std::fs::read_to_string("./salt.json") {
-        let curr_bundle = match serde_json::from_str::<SaltBundle>(&curr_bundle_str) {
+        let mut curr_bundle = match serde_json::from_str::<SaltBundle>(&curr_bundle_str) {
             Ok(b) => b,
             Err(e) => {
                 return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e));
@@ -387,7 +479,7 @@ fn load_current_dir_bundle(state: &mut InterfaceState) -> std::io::Result<()> {
             );
             return Ok(());
         }
-
+        curr_bundle.path = cwd;
         state.bundles.push(curr_bundle.clone());
         state
             .bundle_map
@@ -405,15 +497,15 @@ fn load_added_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
         }
         let paths = std::fs::read_dir(salt_cache_dir.to_owned()).unwrap();
         for path in paths {
-            let it = path.unwrap().path();
-            if std::fs::metadata(it.to_owned()).unwrap().is_dir() {
+            let path_dir = path.unwrap().path();
+            if std::fs::metadata(path_dir.to_owned()).unwrap().is_dir() {
                 let bundle_json =
-                    std::path::Path::new(it.to_owned().to_str().unwrap()).join("salt.json");
+                    std::path::Path::new(path_dir.to_owned().to_str().unwrap()).join("salt.json");
                 if !bundle_json.exists() {
                     continue;
                 }
                 let bundle_str = std::fs::read_to_string(bundle_json.to_str().unwrap())?;
-                let bundle = serde_json::from_str::<SaltBundle>(&bundle_str).unwrap();
+                let mut bundle = serde_json::from_str::<SaltBundle>(&bundle_str).unwrap();
                 if is_intrinsic_bundle(bundle.name.as_str()) {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::Unsupported,
@@ -431,6 +523,8 @@ fn load_added_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
                     );
                     continue;
                 }
+
+                bundle.path = path_dir;
                 state.bundles.push(bundle.clone());
                 state.bundle_map.insert(bundle.name.clone(), bundle);
             }
@@ -449,7 +543,8 @@ fn load_marked_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
             .expect("cannot read salt bundle file in marked loader");
         let mut bundle = serde_json::from_str::<SaltBundle>(&bundle_str)
             .expect("unable to parse salt budle in marked loader");
-        bundle.is_marked = true;
+        bundle.is_pinned = true;
+        bundle.path = mpath.clone();
         // TODO: can be extracted as a function .. the same code is used to
         // load added bundle and
         if is_intrinsic_bundle(bundle.name.as_str()) {
@@ -492,7 +587,7 @@ Salt commands:
                 "{} [{}] {}            - {}\n",
                 bundle.name,
                 bundle.version,
-                if bundle.is_marked { "📌" } else { "" },
+                if bundle.is_pinned { "📌" } else { "" },
                 bundle.description
             )
             .as_str(),
