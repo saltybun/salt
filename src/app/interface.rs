@@ -15,6 +15,7 @@ const INTRINSICS: [(&str, &str, &str); 7] = [
     ("pin", "-p", "pin a folder as a salt bundle"),
     ("watch", "-w", "Runs a watcher for the bundle command"),
     ("install", "-in", "Install a dependency"),
+    ("+", "", "runs the command in pinned directory  +"),
 ];
 
 pub struct Interface {
@@ -241,6 +242,7 @@ impl Interface {
                 "update" | "-u" => self.update_bundles()?,
                 "pin" | "-p" => self.pin_bundle()?,
                 "install" | "-in" => self.install_deps()?,
+                "+" => self.run_wildcard(args)?,
                 _ => self.run_bundle_cmd(bundle.to_owned(), args)?,
             }
         } else {
@@ -250,6 +252,26 @@ impl Interface {
         Ok(())
     }
 
+    fn run_wildcard(&self, args: &[String]) -> Result<()> {
+        if let Some(bundle_name) = args.get(2) {
+            if let Some(bundle) = self.bundle_map.get(bundle_name) {
+                std::env::set_current_dir(&bundle.exec_path)?;
+                if let Some(cmd) = args.get(3) {
+                    let mut some_cmd = std::process::Command::new(cmd);
+                    if let Some(cmd_args) = args.get(4..) {
+                        some_cmd.args(cmd_args);
+                    }
+                    some_cmd.status()?;
+                } else {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "usage: salt > {bundle} {commands...}",
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
     fn add_bundle(&self, bundle_link: Option<&String>) -> Result<()> {
         // if there is no bundle link provided
         // shout at them!
