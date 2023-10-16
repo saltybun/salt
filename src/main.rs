@@ -8,7 +8,7 @@ use app::interface::Interface;
 // .salt will be the cache directory
 
 fn main() -> std::io::Result<()> {
-    let mut app = Interface::init()?;
+    let app = Interface::init()?;
     let mut args: Vec<String> = std::env::args().collect();
     app.run(&mut args)
 }

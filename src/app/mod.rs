@@ -30,7 +30,7 @@ pub struct SaltBundle {
     pub exec_path: PathBuf,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SaltConfig {
     pub pinned_paths: HashMap<String, String>,
 }

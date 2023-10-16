@@ -230,7 +230,7 @@ impl Interface {
         Ok(app)
     }
 
-    pub fn run(&mut self, args: &mut Vec<String>) -> Result<()> {
+    pub fn run(&self, args: &mut Vec<String>) -> Result<()> {
         if let Some(bundle) = args.get(1) {
             match bundle.as_str() {
                 "init" | "-i" => self.init_bundle()?,
@@ -333,7 +333,7 @@ impl Interface {
         Ok(())
     }
 
-    fn pin_bundle(&mut self) -> Result<()> {
+    fn pin_bundle(&self) -> Result<()> {
         let cwd = std::env::current_dir()?;
         if !cwd.join("salt.json").exists() {
             return Err(std::io::Error::new(
@@ -345,11 +345,10 @@ impl Interface {
             &std::fs::read_to_string(cwd.join("salt.json")).unwrap(),
         )
         .unwrap();
-        let c = self.config.as_mut().unwrap();
+        let mut c = self.config.clone().unwrap();
         c.pinned_paths
             .insert(bundle.name, cwd.to_str().unwrap().into());
-
-        write_config(c)?;
+        write_config(&c)?;
 
         println!("pinned :: {}", cwd.to_string_lossy());
         Ok(())
