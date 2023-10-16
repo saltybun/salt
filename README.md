@@ -47,13 +47,13 @@ sh https://github.com/codekidx/salt/salt.sh
 > Add your first bundle
 
 ```sh
-salt add https://github.com/codekidx/salt-pixel.git
+salt add https://github.com/codekidx/salt-popcorn.git
 ```
 
-> Run the new pixel command
+> Run the new popcorn command
 
 ```sh
-salt pixel
+salt popcorn
 ```
 
 ### `salt` intrinsics
@@ -65,7 +65,9 @@ salt pixel
 - `pin` - pinning the folder as a salt bundle
 - `watch {BUNDLE} {COMMAND}` - runs the command from your bundle and restarts
   the process if directory contents changes
-- `install` - install the package `VALUE`
+
+<!-- - `install` - install the package `VALUE` -->
+
 - `+ {BUNDLE} {COMMAND...}` - wildcard command to run any command on a pinned
   bundle
 

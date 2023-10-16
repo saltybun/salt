@@ -8,13 +8,13 @@ use crate::watcher::async_watch;
 use super::{BundleMap, SaltBundle, SaltConfig};
 
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 7] = [
+const INTRINSICS: [(&str, &str, &str); 6] = [
     ("init", "-i", "Initialize new salt bundle in this directory"),
     ("add", "-a", "Adds a salt bundle to your machine"),
     ("update", "-u", "Update a salt bundle"),
     ("pin", "-p", "pin a folder as a salt bundle"),
     ("watch", "-w", "Runs a watcher for the bundle command"),
-    ("install", "-in", "Install a dependency"),
+    // ("install", "-in", "Install a dependency"),
     ("+", "", "runs the command in pinned directory  +"),
 ];
 
@@ -241,7 +241,7 @@ impl Interface {
                 }
                 "update" | "-u" => self.update_bundles()?,
                 "pin" | "-p" => self.pin_bundle()?,
-                "install" | "-in" => self.install_deps()?,
+                // "install" | "-in" => self.install_deps()?,
                 "+" => self.run_wildcard(args)?,
                 _ => self.run_bundle_cmd(bundle.to_owned(), args)?,
             }
@@ -265,13 +265,14 @@ impl Interface {
                 } else {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
-                        "usage: salt > {bundle} {commands...}",
+                        "usage: salt + {bundle} {commands...}",
                     ));
                 }
             }
         }
         Ok(())
     }
+
     fn add_bundle(&self, bundle_link: Option<&String>) -> Result<()> {
         // if there is no bundle link provided
         // shout at them!
@@ -325,11 +326,6 @@ impl Interface {
                 }
             }
         }
-        Ok(())
-    }
-
-    fn install_deps(&self) -> Result<()> {
-        println!("install dependencies is unimplemented");
         Ok(())
     }
 
