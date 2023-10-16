@@ -4,17 +4,28 @@ use notify::Watcher;
 use notify_debouncer_full::new_debouncer;
 use serde::{Deserialize, Serialize};
 
-const INTRINSICS: [(&str, &str); 6] = [
-    ("init", "Initialize new salt bundle in this directory"),
-    ("add", "Adds a salt bundle to your machine"),
-    ("update", "Update a salt bundle"),
-    ("pin", "pin a folder as a salt bundle"),
-    ("watch", "Runs a watcher for the bundle command"),
-    ("i", "Install a dependency"),
+/// INTRINSICS are commands which are internal to salt bundler
+const INTRINSICS: [(&str, &str, &str); 7] = [
+    ("init", "-i", "Initialize new salt bundle in this directory"),
+    ("add", "-a", "Adds a salt bundle to your machine"),
+    ("update", "-u", "Update a salt bundle"),
+    ("pin", "-p", "pin a folder as a salt bundle"),
+    ("watch", "-w", "Runs a watcher for the bundle command"),
+    ("install", "-in", "Install a dependency"),
+    (">", "", "run the command mentioned after >"),
 ];
 
 type BundleMap = HashMap<String, SaltBundle>;
 
+/// FullDebouncer is debouncert type returned by notify_debouncer_full crate when
+/// we create a new debouncer
+type FullDebouncer =
+    notify_debouncer_full::Debouncer<notify::FsEventWatcher, notify_debouncer_full::FileIdMap>;
+/// DebouncerReceiver is the std::sync::mpsc::Receiver type we send to the
+/// notify_debouncer_full crate for receiving FS Change Events
+type DebouncerReceiver = std::sync::mpsc::Receiver<
+    Result<Vec<notify_debouncer_full::DebouncedEvent>, Vec<notify::Error>>,
+>;
 // Notes:
 // pass commonly used settings to devs: SALT_ENV , SALT_ARCH , SALT_OS , SALT_ARGS , SALT_PWD
 // .salt will be the cache directory
@@ -66,12 +77,7 @@ impl InterfaceState {
     }
 }
 
-fn async_debouncer() -> notify::Result<(
-    notify_debouncer_full::Debouncer<notify::FsEventWatcher, notify_debouncer_full::FileIdMap>,
-    std::sync::mpsc::Receiver<
-        Result<Vec<notify_debouncer_full::DebouncedEvent>, Vec<notify::Error>>,
-    >,
-)> {
+fn async_debouncer() -> notify::Result<(FullDebouncer, DebouncerReceiver)> {
     let (tx, rx) = std::sync::mpsc::channel();
     // TODO: this debouncer duration can be taken from bundle config as well
     // in key watcher:{ duration: Number(1) }
@@ -121,35 +127,36 @@ fn main() -> std::io::Result<()> {
     let mut args: Vec<String> = std::env::args().collect();
     if let Some(bundle) = args.get(1) {
         match bundle.as_str() {
-            "init" => init_bundle()?,
-            "add" => add_bundle(args.get(2))?,
-            "watch" => {
+            "init" | "-i" => init_bundle()?,
+            "add" | "-a" => add_bundle(args.get(2))?,
+            "watch" | "-w" => {
                 args.rotate_left(1);
                 start_watcher(&state, args)?
             }
-            "update" => update_bundles()?,
-            "pin" => pin_bundle(state.config)?,
-            "i" => install_deps()?,
+            "update" | "-u" => update_bundles()?,
+            "pin" | "-p" => pin_bundle(state.config)?,
+            "install" | "-in" => install_deps()?,
+            ">" => install_deps()?,
             _ => run_bundle_cmd(&state, bundle.to_owned(), args)?,
         }
     } else {
         display_salt_help(&state.bundles);
     }
 
-    return Ok(());
+    Ok(())
 }
 
 fn update_bundles() -> std::io::Result<()> {
     if let Some(home) = home::home_dir() {
         let salt_cache_dir = std::path::Path::new(home.to_str().unwrap()).join(".salt");
         if !salt_cache_dir.exists() {
-            std::fs::create_dir(salt_cache_dir.to_owned())?;
+            std::fs::create_dir(&salt_cache_dir)?;
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "no added salt bundles",
             ));
         }
-        let paths = std::fs::read_dir(salt_cache_dir.to_owned()).unwrap();
+        let paths = std::fs::read_dir(&salt_cache_dir).unwrap();
         for path in paths {
             let path_dir = path.unwrap();
             if path_dir.path().is_dir() {
@@ -311,14 +318,12 @@ fn run_bundle_cmd(
 fn run_watch_bundle_cmd(
     state: &InterfaceState,
     bundle_name: &String,
-    args: &Vec<String>,
+    args: &[String],
 ) -> std::io::Result<()> {
     if let Some(bundle) = state.bundle_map.get(bundle_name) {
         if let Some(command) = bundle.commands.get(args.get(2).unwrap()) {
             futures::executor::block_on(async {
-                if let Err(e) =
-                    async_watch(command, std::path::PathBuf::from(bundle.path.clone())).await
-                {
+                if let Err(e) = async_watch(command, bundle.path.clone()).await {
                     println!("error: {:?}", e)
                 }
             });
@@ -355,7 +360,7 @@ fn add_bundle(bundle_link: Option<&String>) -> std::io::Result<()> {
     // get a proper bundle name from the git repository link
     let bundle_name = get_bundle_name(bundle_link.unwrap())?;
     // clone the git repository provided
-    clone_bundle(&bundle_link.unwrap(), &bundle_name)?;
+    clone_bundle(bundle_link.unwrap(), &bundle_name)?;
     Ok(())
 }
 
@@ -365,17 +370,14 @@ fn get_bundle_name(bundle_link: &String) -> std::io::Result<String> {
     check_remote_cmd.stdout(Stdio::null());
     check_remote_cmd.stderr(Stdio::null());
     let check_remote_cmd_status = check_remote_cmd.status()?.code();
-    match check_remote_cmd_status {
-        Some(128) => {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "the repository does not exists or has incorrect access rights",
-            ));
-        }
-        _ => {}
+    if let Some(128) = check_remote_cmd_status {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "the repository does not exists or has incorrect access rights",
+        ));
     };
 
-    let link_cmp: Vec<&str> = bundle_link.split("/").collect();
+    let link_cmp: Vec<&str> = bundle_link.split('/').collect();
     let last_cmp = match link_cmp.last() {
         Some(l) => l,
         None => {
@@ -459,7 +461,7 @@ fn start_watcher(state: &InterfaceState, args: Vec<String>) -> std::io::Result<(
         run_watch_bundle_cmd(state, bundle, &args)?;
     }
 
-    return err;
+    err
 }
 
 fn load_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
@@ -476,7 +478,7 @@ fn is_intrinsic_bundle(bundle_name: &str) -> bool {
             return true;
         }
     }
-    return false;
+    false
 }
 
 fn load_current_dir_bundle(state: &mut InterfaceState) -> std::io::Result<()> {
@@ -513,8 +515,8 @@ fn load_current_dir_bundle(state: &mut InterfaceState) -> std::io::Result<()> {
 
         if state.bundle_map.contains_key(&curr_bundle.name) {
             println!(
-                "there is a name conflict for bundle: {} at path: {}",
-                curr_bundle.name, "./salt.json"
+                "there is a name conflict for bundle: {} at path: ./salt.json",
+                curr_bundle.name
             );
             return Ok(());
         }
@@ -532,12 +534,12 @@ fn load_added_bundles(state: &mut InterfaceState) -> std::io::Result<()> {
     if let Some(home_dir) = home::home_dir() {
         let salt_cache_dir = std::path::Path::new(home_dir.to_str().unwrap()).join(".salt");
         if !salt_cache_dir.exists() {
-            std::fs::create_dir(salt_cache_dir.to_owned())?;
+            std::fs::create_dir(&salt_cache_dir)?;
         }
-        let paths = std::fs::read_dir(salt_cache_dir.to_owned()).unwrap();
+        let paths = std::fs::read_dir(&salt_cache_dir).unwrap();
         for path in paths {
             let path_dir = path.unwrap().path();
-            if std::fs::metadata(path_dir.to_owned()).unwrap().is_dir() {
+            if std::fs::metadata(&path_dir).unwrap().is_dir() {
                 let bundle_json =
                     std::path::Path::new(path_dir.to_owned().to_str().unwrap()).join("salt.json");
                 if !bundle_json.exists() {
@@ -617,7 +619,19 @@ Salt commands:
 "#
     .into();
     for ibundle in INTRINSICS {
-        help.push_str(format!("{}       - {}\n", ibundle.0, ibundle.1).as_str());
+        help.push_str(
+            format!(
+                "{}{}      - {}\n",
+                ibundle.0,
+                if !ibundle.1.is_empty() {
+                    format!("[{}]", ibundle.1)
+                } else {
+                    "".into()
+                },
+                ibundle.2
+            )
+            .as_str(),
+        );
     }
     help.push_str("\nBundle commands:\n");
     for bundle in bundles {
