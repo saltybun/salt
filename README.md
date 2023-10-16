@@ -61,10 +61,13 @@ salt pixel
 - `init` - inits a new `salt.json` file in the current directory with example
   command
 - `add` - adds a bundle to your salt interface
+- `update` - update all added bundles
 - `pin` - pinning the folder as a salt bundle
 - `watch {BUNDLE} {COMMAND}` - runs the command from your bundle and restarts
   the process if directory contents changes
-- `i` - install the package `VALUE`
+- `install` - install the package `VALUE`
+- `+ {BUNDLE} {COMMAND...}` - wildcard command to run any command on a pinned
+  bundle
 
 ### `salt.json`
 
@@ -133,14 +136,6 @@ command
 
 ```sh
 salt pin
-```
-
-or pass a folder name with `pin` command. If folder does not exists it will
-throw an error. `pin` command will fail if it does not find `salt.json` is not
-present.
-
-```sh
-salt pin /Users/codekidx/mybundle
 ```
 
 ### updating a bundle
