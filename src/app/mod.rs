@@ -22,12 +22,19 @@ pub struct SaltBundle {
     pub description: String,
     pub commands: HashMap<String, Command>,
 
+    pub watcher: Watcher,
+
     #[serde(skip_serializing, skip_deserializing)]
     pub is_pinned: bool,
     #[serde(skip_serializing, skip_deserializing)]
     pub bundle_path: PathBuf,
     #[serde(skip_serializing, skip_deserializing)]
     pub exec_path: PathBuf,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct Watcher {
+    pub debounce_secs: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

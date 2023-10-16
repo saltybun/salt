@@ -382,6 +382,7 @@ impl Interface {
             is_pinned: false,
             bundle_path: PathBuf::new(),
             exec_path: PathBuf::new(),
+            watcher: super::Watcher { debounce_secs: 1 },
         };
         let new_bundle_string = serde_json::to_string_pretty::<SaltBundle>(&new_bundle).unwrap();
         let mut file = std::fs::File::create(bundle_file_path)?;
@@ -527,7 +528,13 @@ impl Interface {
         if let Some(bundle) = self.bundle_map.get(bundle_name) {
             if let Some(command) = bundle.commands.get(args.get(2).unwrap()) {
                 futures::executor::block_on(async {
-                    if let Err(e) = async_watch(command, bundle.exec_path.clone()).await {
+                    if let Err(e) = async_watch(
+                        command,
+                        bundle.exec_path.clone(),
+                        bundle.watcher.debounce_secs,
+                    )
+                    .await
+                    {
                         println!("error: {:?}", e)
                     }
                 });

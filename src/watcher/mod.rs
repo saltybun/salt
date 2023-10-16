@@ -14,20 +14,21 @@ type DebouncerReceiver = std::sync::mpsc::Receiver<
     Result<Vec<notify_debouncer_full::DebouncedEvent>, Vec<notify::Error>>,
 >;
 
-fn async_debouncer() -> notify::Result<(FullDebouncer, DebouncerReceiver)> {
+fn async_debouncer(debounce_secs: u64) -> notify::Result<(FullDebouncer, DebouncerReceiver)> {
     let (tx, rx) = std::sync::mpsc::channel();
     // TODO: this debouncer duration can be taken from bundle config as well
     // in key watcher:{ duration: Number(1) }
-    let debouncer = new_debouncer(Duration::from_secs(1), None, tx)?;
+    let debouncer = new_debouncer(Duration::from_secs(debounce_secs), None, tx)?;
     Ok((debouncer, rx))
 }
 
 pub async fn async_watch<P: AsRef<std::path::Path>>(
     command: &Command,
     path: P,
+    debounce_secs: u64,
 ) -> notify::Result<()> {
     println!("Starting to watch: {}", path.as_ref().to_string_lossy());
-    let (mut debouncer, rx) = async_debouncer()?;
+    let (mut debouncer, rx) = async_debouncer(debounce_secs)?;
     let mut child;
     // Add a path to be watched. All files and directories at that path and
     // below will be monitored for changes.
