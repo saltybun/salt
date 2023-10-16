@@ -223,7 +223,6 @@ impl Interface {
             bundles: vec![],
             config: None,
         };
-        clear_screen();
         load_config(&mut app)?;
         load_bundles(&mut app)?;
 
@@ -232,6 +231,7 @@ impl Interface {
 
     pub fn run(&self, args: &mut Vec<String>) -> Result<()> {
         if let Some(bundle) = args.get(1) {
+            clear_screen();
             match bundle.as_str() {
                 "init" | "-i" => self.init_bundle()?,
                 "add" | "-a" => self.add_bundle(args.get(2))?,
