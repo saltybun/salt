@@ -231,7 +231,7 @@ impl Interface {
     }
 
     pub fn save_to_history(&self, args: &Vec<String>) -> Result<()> {
-        if args.len() < 2 {
+        if args.len() <= 2 {
             return Ok(());
         }
         if let Some(home) = home::home_dir() {
