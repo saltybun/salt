@@ -8,7 +8,7 @@ use crate::watcher::async_watch;
 use super::{BundleMap, SaltBundle, SaltConfig};
 
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 6] = [
+const INTRINSICS: [(&str, &str, &str); 7] = [
     ("init", "-i", "Initialize new salt bundle in this directory"),
     ("add", "-a", "Adds a salt bundle to your machine"),
     ("update", "-u", "Update a salt bundle"),
@@ -16,6 +16,7 @@ const INTRINSICS: [(&str, &str, &str); 6] = [
     ("watch", "-w", "Runs a watcher for the bundle command"),
     // ("install", "-in", "Install a dependency"),
     ("+", "", "runs the command in pinned directory  +"),
+    ("-", "", "run the last salt command"),
 ];
 
 pub struct Interface {
@@ -229,26 +230,49 @@ impl Interface {
         Ok(app)
     }
 
-    pub fn run(&self, args: &mut Vec<String>) -> Result<()> {
+    pub fn save_to_history(&self, args: &Vec<String>) -> Result<()> {
+        if args.len() < 2 {
+            return Ok(());
+        }
+        if let Some(home) = home::home_dir() {
+            let history_file_path = home.join(".salt").join(".history");
+            let mut hfile = std::fs::File::create(history_file_path)?;
+            hfile.write_all(args.join(" ").as_bytes())?;
+        }
+        Ok(())
+    }
+
+    pub fn run(&self, args: &Vec<String>) -> Result<()> {
         if let Some(bundle) = args.get(1) {
             clear_screen();
             match bundle.as_str() {
                 "init" | "-i" => self.init_bundle()?,
                 "add" | "-a" => self.add_bundle(args.get(2))?,
                 "watch" | "-w" => {
-                    args.rotate_left(1);
-                    self.start_watcher(args)?
+                    let mut a = args.clone();
+                    a.rotate_left(1);
+                    self.start_watcher(&a)?
                 }
                 "update" | "-u" => self.update_bundles()?,
                 "pin" | "-p" => self.pin_bundle()?,
                 // "install" | "-in" => self.install_deps()?,
                 "+" => self.run_wildcard(args)?,
+                "-" => self.run_last_cmd()?,
                 _ => self.run_bundle_cmd(bundle.to_owned(), args)?,
             }
         } else {
             self.display_salt_help(&self.bundles);
         }
 
+        Ok(())
+    }
+
+    fn run_last_cmd(&self) -> Result<()> {
+        if let Some(home) = home::home_dir() {
+            let history_file_path = home.join(".salt").join(".history");
+            let cmd_str = std::fs::read_to_string(history_file_path)?;
+            self.run(&cmd_str.split(' ').map(|s| s.to_owned()).collect())?;
+        }
         Ok(())
     }
 

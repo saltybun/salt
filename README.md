@@ -28,13 +28,13 @@ tool.
 
 ### `salt` use-cases
 
-- Quickly create a CLI with 2 commands `salt init` and `salt pin`
+- Quickly create a CLI with 2 commands `s init` and `s pin`
 - Importing scripts from anywhere. If your git repository has `salt.json` it is
   considered as a bundle.
 - Can be used as a tooling framework for your project/organization.
 - Cross-team tooling and collaboration
 - No directory/context switching needed
-- Seamless updates of your bundle through `salt update`
+- Seamless updates of your bundle through `s update`
 
 ### `salt` quickstart
 
@@ -47,13 +47,13 @@ sh https://github.com/codekidx/salt/salt.sh
 > Add your first bundle
 
 ```sh
-salt add https://github.com/codekidx/salt-popcorn.git
+s add https://github.com/codekidx/salt-popcorn.git
 ```
 
 > Run the new popcorn command
 
 ```sh
-salt popcorn
+s popcorn
 ```
 
 ### `salt` intrinsics
@@ -70,6 +70,7 @@ salt popcorn
 
 - `+ {BUNDLE} {COMMAND...}` - wildcard command to run any command on a pinned
   bundle
+- `-` - runs the last salt command
 
 ### `salt.json`
 
@@ -94,7 +95,7 @@ bundler to read and interpret a bundle called `do` and a command called `ls`.
 The same can be invoked using the followin command:
 
 ```
-salt do ls
+s do ls
 ```
 
 Here are the list of fields and descriptions of bundle file.
@@ -128,7 +129,7 @@ file.
 A new bundle can be initialized with the following command.
 
 ```sh
-salt init
+s init
 ```
 
 ### pinning a folder as bundle
@@ -137,7 +138,7 @@ You can create `salt.json` in any folder and use it as a bundle using the `pin`
 command
 
 ```sh
-salt pin
+s pin
 ```
 
 ### updating a bundle
@@ -147,5 +148,5 @@ will update the repository with the latest commits. To check for updates and
 update to the latest version, you can run the `update` command
 
 ```sh
-salt update
+s update
 ```

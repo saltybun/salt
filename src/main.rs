@@ -9,6 +9,9 @@ use app::interface::Interface;
 
 fn main() -> std::io::Result<()> {
     let app = Interface::init()?;
-    let mut args: Vec<String> = std::env::args().collect();
-    app.run(&mut args)
+    let args: Vec<String> = std::env::args().collect();
+    match app.run(&args) {
+        Ok(_) => app.save_to_history(&args),
+        Err(e) => Err(e),
+    }
 }
