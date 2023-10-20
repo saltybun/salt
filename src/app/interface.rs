@@ -8,13 +8,17 @@ use crate::watcher::async_watch;
 use super::{BundleMap, SaltBundle, SaltConfig};
 
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 7] = [
-    ("init", "-i", "Initialize new salt bundle in this directory"),
-    ("add", "-a", "Adds a salt bundle to your machine"),
-    ("update", "-u", "Update a salt bundle"),
-    ("pin", "-p", "pin a folder as a salt bundle"),
-    ("watch", "-w", "Runs a watcher for the bundle command"),
-    // ("install", "-in", "Install a dependency"),
+const INTRINSICS: [(&str, &str, &str); 8] = [
+    ("init", "i", "Initialize new salt bundle in this directory"),
+    ("add", "a", "Adds a salt bundle to your machine"),
+    ("update", "u", "Update a salt bundle"),
+    ("pin", "p", "pin a folder as a salt bundle"),
+    ("watch", "w", "Runs a watcher for the bundle command"),
+    (
+        "jump",
+        "j",
+        "jump to bundle directory with cd $(s j BUNDLE)",
+    ),
     ("+", "", "runs the command in pinned directory  +"),
     ("-", "", "run the last salt command"),
 ];
@@ -242,19 +246,19 @@ impl Interface {
         Ok(())
     }
 
-    pub fn run(&self, args: &Vec<String>) -> Result<()> {
+    pub fn run(&self, args: &[String]) -> Result<()> {
         if let Some(bundle) = args.get(1) {
-            clear_screen();
             match bundle.as_str() {
-                "init" | "-i" => self.init_bundle()?,
-                "add" | "-a" => self.add_bundle(args.get(2))?,
-                "watch" | "-w" => {
-                    let mut a = args.clone();
+                "init" | "i" => self.init_bundle()?,
+                "add" | "a" => self.add_bundle(args.get(2))?,
+                "watch" | "w" => {
+                    let mut a = args.to_owned();
                     a.rotate_left(1);
                     self.start_watcher(&a)?
                 }
-                "update" | "-u" => self.update_bundles()?,
-                "pin" | "-p" => self.pin_bundle()?,
+                "update" | "u" => self.update_bundles()?,
+                "pin" | "p" => self.pin_bundle()?,
+                "jump" | "j" => self.jump_to_bundle(args)?,
                 // "install" | "-in" => self.install_deps()?,
                 "+" => self.run_wildcard(args)?,
                 "-" => self.run_last_cmd()?,
@@ -267,17 +271,39 @@ impl Interface {
         Ok(())
     }
 
+    fn jump_to_bundle(&self, args: &[String]) -> Result<()> {
+        let not_found_err = Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "bundle not found",
+        ));
+        if let Some(bundle_name) = args.get(2) {
+            if let Some(bundle) = self.bundle_map.get(bundle_name) {
+                println!("{}", bundle.exec_path.to_str().unwrap());
+                return Ok(());
+            }
+            return not_found_err;
+        }
+        not_found_err
+    }
+
     fn run_last_cmd(&self) -> Result<()> {
         if let Some(home) = home::home_dir() {
             let history_file_path = home.join(".salt").join(".history");
             let cmd_str = std::fs::read_to_string(history_file_path)?;
-            self.run(&cmd_str.split(' ').map(|s| s.to_owned()).collect())?;
+            self.run(
+                &cmd_str
+                    .split(' ')
+                    .map(|s| s.to_owned())
+                    .collect::<Vec<String>>(),
+            )?;
         }
         Ok(())
     }
 
     fn run_wildcard(&self, args: &[String]) -> Result<()> {
         if let Some(bundle_name) = args.get(2) {
+            // if we have a bundle with the name given as 2nd arg
+            // run the command of the bundle
             if let Some(bundle) = self.bundle_map.get(bundle_name) {
                 std::env::set_current_dir(&bundle.exec_path)?;
                 if let Some(cmd) = args.get(3) {
@@ -285,7 +311,7 @@ impl Interface {
                     if let Some(cmd_args) = args.get(4..) {
                         some_cmd.args(cmd_args);
                     }
-                    some_cmd.status()?;
+                    return some_cmd.status().map(|_| ());
                 } else {
                     return Err(std::io::Error::new(
                         std::io::ErrorKind::InvalidData,
@@ -293,8 +319,21 @@ impl Interface {
                     ));
                 }
             }
+            // if the bundle is not found in our bundle map, lets allow user
+            // to run this command in the current directory
+            // I don't know why someone would use it this way but it is better than
+            // wasting user's time
+            let mut some_cmd = std::process::Command::new(bundle_name);
+            if let Some(cmd_args) = args.get(3..) {
+                some_cmd.args(cmd_args);
+            }
+            return some_cmd.status().map(|_| ());
         }
-        Ok(())
+
+        Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "bundle not found",
+        ))
     }
 
     fn add_bundle(&self, bundle_link: Option<&String>) -> Result<()> {
@@ -567,6 +606,7 @@ impl Interface {
     }
 
     fn display_salt_help(&self, bundles: &Vec<SaltBundle>) {
+        clear_screen();
         let mut help: String = r#" [🧂] gives you superpowers
 version: 0.1.0
     
@@ -606,6 +646,7 @@ Salt commands:
     }
 
     fn display_bundle_command_help(&self, name: &str, bundle: &SaltBundle) {
+        clear_screen();
         let mut help: String = format!(
             r#"[🧂 Bundle :: {}]
     
