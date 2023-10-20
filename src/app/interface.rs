@@ -8,11 +8,13 @@ use crate::watcher::async_watch;
 use super::{BundleMap, SaltBundle, SaltConfig};
 
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 8] = [
+const INTRINSICS: [(&str, &str, &str); 10] = [
     ("init", "i", "Initialize new salt bundle in this directory"),
     ("add", "a", "Adds a salt bundle to your machine"),
     ("update", "u", "Update a salt bundle"),
     ("pin", "p", "pin a folder as a salt bundle"),
+    ("open", "o", "open a salt bundle in default file explorer"),
+    ("unpin", "unp", "unpin a pinned salt bundle"),
     ("watch", "w", "Runs a watcher for the bundle command"),
     (
         "jump",
@@ -25,10 +27,13 @@ const INTRINSICS: [(&str, &str, &str); 8] = [
 
 pub struct Interface {
     bundles: Vec<SaltBundle>,
-    // this is to check if there is bundle conflict
+    /// this is to check if there is bundle conflict
     bundle_map: BundleMap,
-    // TDOO: dont keep config as optional
+    /// TDOO: dont keep config as optional
     config: Option<SaltConfig>,
+    /// full_config is untouched config which is directly read from config file
+    /// it does not get mutated across whole flow
+    full_config: Option<SaltConfig>,
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -48,14 +53,16 @@ fn load_config(state: &mut Interface) -> Result<()> {
             if let Ok(config_str) = std::fs::read_to_string(salt_config_path) {
                 let c = serde_json::from_str::<SaltConfig>(&config_str)
                     .expect("error while reading salt config");
-                state.config = Some(c);
+                state.config = Some(c.clone());
+                state.full_config = Some(c);
             }
         } else {
             let cfg = SaltConfig {
                 pinned_paths: HashMap::new(),
             };
             write_config(&cfg)?;
-            state.config = Some(cfg);
+            state.config = Some(cfg.clone());
+            state.full_config = Some(cfg);
         }
     }
     Ok(())
@@ -221,12 +228,43 @@ fn load_pinned_bundles(state: &mut Interface) -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
+fn open_explorer(path: &str) -> Result<()> {
+    let mut open_cmd = std::process::Command::new("open");
+    if !path.is_empty() {
+        open_cmd.arg(path);
+        return open_cmd.status().map(|_| ());
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn open_explorer(path: &str) -> Result<()> {
+    let mut open_cmd = std::process::Command::new("start");
+    if !path.is_empty() {
+        open_cmd.arg(path);
+        return open_cmd.status().map(|_| ());
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "linux")]
+fn open_explorer(path: &str) -> Result<()> {
+    let mut open_cmd = std::process::Command::new("xdg-open");
+    if !path.is_empty() {
+        open_cmd.arg(path);
+        return open_cmd.status().map(|_| ());
+    }
+    Ok(())
+}
+
 impl Interface {
     pub fn init() -> Result<Self> {
         let mut app = Self {
             bundle_map: HashMap::new(),
             bundles: vec![],
             config: None,
+            full_config: None,
         };
         load_config(&mut app)?;
         load_bundles(&mut app)?;
@@ -257,7 +295,9 @@ impl Interface {
                     self.start_watcher(&a)?
                 }
                 "update" | "u" => self.update_bundles()?,
+                "open" | "o" => self.open_bundle(args)?,
                 "pin" | "p" => self.pin_bundle()?,
+                "unpin" | "unp" => self.unpin_bundle(args)?,
                 "jump" | "j" => self.jump_to_bundle(args)?,
                 // "install" | "-in" => self.install_deps()?,
                 "+" => self.run_wildcard(args)?,
@@ -269,6 +309,33 @@ impl Interface {
         }
 
         Ok(())
+    }
+
+    fn open_bundle(&self, args: &[String]) -> Result<()> {
+        if let Some(bundle_name) = args.get(2) {
+            if let Some(bundle) = self.bundle_map.get(bundle_name) {
+                dbg!("has bundle");
+                return open_explorer(bundle.exec_path.to_str().unwrap());
+            }
+        }
+        open_explorer("")
+    }
+
+    fn unpin_bundle(&self, args: &[String]) -> Result<()> {
+        let not_found_err = Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "bundle not found",
+        ));
+        if let Some(bundle_name) = args.get(2) {
+            if let Some(_) = self.bundle_map.get(bundle_name) {
+                let mut c = self.full_config.clone().unwrap();
+                c.pinned_paths.remove(bundle_name);
+                dbg!(&c);
+                return write_config(&c);
+            }
+        }
+
+        not_found_err
     }
 
     fn jump_to_bundle(&self, args: &[String]) -> Result<()> {
