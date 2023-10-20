@@ -25,6 +25,7 @@ tool.
   - [creating a new bundle](#creating-a-new-bundle)
   - [pinning a folder as bundle](#pinning-a-folder-as-bundle)
   - [updating a bundle](#updating-a-bundle)
+  - [jumping to the bundle directory](#jumping-to-the-bundle-directory)
 
 ### `salt` use-cases
 
@@ -63,6 +64,7 @@ s popcorn
 - `add` - adds a bundle to your salt interface
 - `update` - update all added bundles
 - `pin` - pinning the folder as a salt bundle
+- `jump` - jump to the bundle folder
 - `watch {BUNDLE} {COMMAND}` - runs the command from your bundle and restarts
   the process if directory contents changes
 
@@ -150,3 +152,14 @@ update to the latest version, you can run the `update` command
 ```sh
 s update
 ```
+
+### jumping to the bundle directory
+
+To switch between bundles efficiently salt has the `jump | j` command which can
+be used with `cd` command to jump to the bundle directory.
+
+```sh
+cd $(s j $bundle)
+```
+
+where `$bundle` is the name of your bundle.
