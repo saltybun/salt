@@ -2,13 +2,11 @@ Salt is command line bundler and a command manager that lets you define bundles
 of scripts and bring all your scripts under a single command called `salt | s`.
 The focus of this tool is to seamlessly share scripts between teams and improve
 productivity with ease of use. [Bundles](#salt-bundle) let your quickly import
-scripts from any folder or a git repository. This project was initially created
-for [🍿](https://github.com/codekidx/popcorn) and was extracted as a standalone
-tool.
+scripts from any folder or a git repository.
 
 # 🧂
 
-> _Boost your development workflow with a 🤏🏻 of 🧂_
+> _Boost your productivity with a 🤏🏻 of 🧂_
 
 ![version](https://img.shields.io/badge/version-v0.1.0-orange)
 ![category](https://img.shields.io/badge/beta-teal)
@@ -24,6 +22,7 @@ tool.
 - [`salt` bundle](#salt-bundle)
   - [creating a new bundle](#creating-a-new-bundle)
   - [pinning a folder as bundle](#pinning-a-folder-as-bundle)
+  - [unpinning a bundle](#unpinning-a-bundle)
   - [updating a bundle](#updating-a-bundle)
   - [jumping to the bundle directory](#jumping-to-the-bundle-directory)
 
@@ -64,6 +63,8 @@ s popcorn
 - `add` - adds a bundle to your salt interface
 - `update` - update all added bundles
 - `pin` - pinning the folder as a salt bundle
+- `unpin` - unpin a salt bundle
+- `open` - open a bundle in your default file manager
 - `jump` - jump to the bundle folder
 - `watch {BUNDLE} {COMMAND}` - runs the command from your bundle and restarts
   the process if directory contents changes
@@ -142,6 +143,17 @@ command
 ```sh
 s pin
 ```
+
+### unpinning a bundle
+
+Pinned bundle can be unpinned with the following command
+
+```sh
+s unpin
+```
+
+the unpinned bundle can be pinned again, but once unpinned the salt bundler will
+not have access to the bundle.
 
 ### updating a bundle
 

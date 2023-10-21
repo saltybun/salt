@@ -228,28 +228,12 @@ fn load_pinned_bundles(state: &mut Interface) -> Result<()> {
     Ok(())
 }
 
-#[cfg(target_os = "macos")]
 fn open_explorer(path: &str) -> Result<()> {
+    #[cfg(target_os = "macos")]
     let mut open_cmd = std::process::Command::new("open");
-    if !path.is_empty() {
-        open_cmd.arg(path);
-        return open_cmd.status().map(|_| ());
-    }
-    Ok(())
-}
-
-#[cfg(target_os = "windows")]
-fn open_explorer(path: &str) -> Result<()> {
+    #[cfg(target_os = "windows")]
     let mut open_cmd = std::process::Command::new("start");
-    if !path.is_empty() {
-        open_cmd.arg(path);
-        return open_cmd.status().map(|_| ());
-    }
-    Ok(())
-}
-
-#[cfg(target_os = "linux")]
-fn open_explorer(path: &str) -> Result<()> {
+    #[cfg(target_os = "linux")]
     let mut open_cmd = std::process::Command::new("xdg-open");
     if !path.is_empty() {
         open_cmd.arg(path);
