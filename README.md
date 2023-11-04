@@ -1,13 +1,3 @@
----
-name = bin
-type = project
-intro = 🧂
-commands = [
-  b = cargo build = builds the salt binary
-  i = cp target/debug/salt /usr/local/bin/s = copies the salt binary in path
-]
----
-
 # 🧂
 
 salt is command line bundler and a command manager that lets you define bundles
