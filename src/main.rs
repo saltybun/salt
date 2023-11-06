@@ -8,7 +8,7 @@ use app::interface::Interface;
 // .salt will be the cache directory
 
 fn main() -> std::io::Result<()> {
-    let app = Interface::init()?;
+    let mut app = Interface::init()?;
     let args: Vec<String> = std::env::args().collect();
     match app.run(&args) {
         Ok(_) => app.save_to_history(&args),

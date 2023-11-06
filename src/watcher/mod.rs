@@ -2,7 +2,7 @@ use notify::Watcher;
 use notify_debouncer_full::new_debouncer;
 use std::time::Duration;
 
-use crate::app::Command;
+use crate::app::{interface::Interface, Command};
 
 /// FullDebouncer is debouncert type returned by notify_debouncer_full crate when
 /// we create a new debouncer
@@ -23,6 +23,7 @@ fn async_debouncer(debounce_secs: u64) -> notify::Result<(FullDebouncer, Debounc
 }
 
 pub async fn async_watch<P: AsRef<std::path::Path>>(
+    app: &Interface,
     command: &Command,
     path: P,
     debounce_secs: u64,
@@ -38,6 +39,7 @@ pub async fn async_watch<P: AsRef<std::path::Path>>(
     // watcher.watch(path.as_ref(), notify::RecursiveMode::Recursive)?;
 
     let mut cmd_proc = std::process::Command::new(&command.command);
+    cmd_proc.envs(&app.env_vars);
     cmd_proc.args(&command.args);
     child = cmd_proc.spawn().unwrap();
     println!("starting first: {}", child.id());
@@ -57,4 +59,28 @@ pub async fn async_watch<P: AsRef<std::path::Path>>(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use crate::{app::Command, watcher::async_watch};
+
+    use super::async_debouncer;
+
+    #[test]
+    fn gets_a_deboucer() {
+        assert_eq!(async_debouncer(1).is_ok(), true);
+    }
+
+    #[test]
+    fn run_async_watcher() {
+        assert_eq!(
+            std::path::PathBuf::from("./")
+                .join("watch.test.file")
+                .exists(),
+            true
+        );
+    }
 }

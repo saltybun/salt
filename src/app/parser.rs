@@ -1,22 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use markdown::Block;
 
-use super::Command;
+use crate::app::Watcher;
 
-#[derive(Debug)]
-pub(crate) struct MDOptions {
-    typ: String,
-}
-
-#[derive(Debug)]
-pub(crate) struct MDBundle {
-    processed: bool,
-    docs: HashMap<String, Vec<Block>>,
-    options: MDOptions,
-    commands: HashMap<String, Command>,
-    about: String,
-}
+use super::{Command, MDBundle, MDOptions};
 
 impl From<Vec<markdown::Block>> for MDBundle {
     fn from(value: Vec<markdown::Block>) -> Self {
@@ -25,9 +13,14 @@ impl From<Vec<markdown::Block>> for MDBundle {
             docs: HashMap::new(),
             options: MDOptions {
                 typ: "bundle".into(),
+                name: String::new(),
             },
+            watcher: Watcher { debounce_secs: 2 },
             commands: HashMap::new(),
             about: String::new(),
+            is_pinned: false,
+            bundle_path: PathBuf::new(),
+            exec_path: PathBuf::new(),
         };
 
         // mode 0 = processing about
@@ -36,7 +29,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
         // mode 3 = processing options
         let mut mode = 0;
         let mut doc_section = String::new();
-        println!("Values: {:?}", value);
+        // println!("Values: {:?}", value);
         for block in value {
             match block {
                 Block::Paragraph(pspans) => {
@@ -60,7 +53,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                     }
                 }
                 Block::Header(h, hsize) => {
-                    println!("header : {h:?}");
+                    // println!("header : {h:?}");
 
                     if hsize == 1 as usize {
                         continue;
@@ -113,7 +106,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                         for item in items {
                             match item {
                                 markdown::ListItem::Simple(span_vec) => {
-                                    println!("command: {span_vec:?}");
+                                    // println!("command: {span_vec:?}");
                                     let mut cmd_info = String::new();
                                     for span in span_vec {
                                         match span {
@@ -122,7 +115,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                             _ => return bundle,
                                         };
                                     }
-                                    println!("joint: {cmd_info}");
+                                    // println!("joint: {cmd_info}");
                                     let splitted = cmd_info
                                         .split("-")
                                         .map(|e| e.trim())
@@ -166,6 +159,10 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                     match splitted.first().unwrap().to_owned() {
                                         "type" => {
                                             bundle.options.typ =
+                                                splitted.get(1).unwrap().to_owned().into();
+                                        }
+                                        "name" => {
+                                            bundle.options.name =
                                                 splitted.get(1).unwrap().to_owned().into();
                                         }
                                         _ => {

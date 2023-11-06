@@ -3,36 +3,35 @@ use std::{collections::HashMap, path::PathBuf};
 use serde::{Deserialize, Serialize};
 
 pub(crate) mod interface;
+pub(crate) mod parser;
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Command {
     pub about: String,
     pub command: String,
     pub args: Vec<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
-pub struct SaltBundle {
-    pub name: String,
-    pub requires: Option<Vec<String>>,
-    // TODO: we can exclude some paths from getting notification event
-    // for restart
-    // pub exclude: Vec<String>,
-    pub version: String,
-    pub description: String,
-    pub commands: HashMap<String, Command>,
-
-    pub watcher: Watcher,
-
-    #[serde(skip_serializing, skip_deserializing)]
-    pub is_pinned: bool,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub bundle_path: PathBuf,
-    #[serde(skip_serializing, skip_deserializing)]
-    pub exec_path: PathBuf,
+#[derive(Debug, Clone)]
+pub(crate) struct MDOptions {
+    pub(crate) typ: String,
+    pub(crate) name: String,
 }
 
-#[derive(Serialize, Deserialize, Clone)]
+#[derive(Debug, Clone)]
+pub struct MDBundle {
+    pub(crate) processed: bool,
+    pub(crate) docs: HashMap<String, Vec<markdown::Block>>,
+    pub(crate) options: MDOptions,
+    pub(crate) commands: HashMap<String, Command>,
+    pub(crate) about: String,
+
+    pub is_pinned: bool,
+    pub bundle_path: PathBuf,
+    pub exec_path: PathBuf,
+    pub watcher: Watcher,
+}
+#[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Watcher {
     pub debounce_secs: u64,
 }
@@ -42,4 +41,4 @@ pub struct SaltConfig {
     pub pinned_paths: HashMap<String, String>,
 }
 
-pub type BundleMap = HashMap<String, SaltBundle>;
+pub type BundleMap = HashMap<String, MDBundle>;

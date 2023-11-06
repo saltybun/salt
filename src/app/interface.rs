@@ -5,13 +5,15 @@ use std::process::Stdio;
 
 use crate::watcher::async_watch;
 
-use super::{BundleMap, SaltBundle, SaltConfig};
+use super::MDBundle;
+use super::{BundleMap, SaltConfig};
 
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 10] = [
+const INTRINSICS: [(&str, &str, &str); 9] = [
     ("init", "i", "Initialize new salt bundle in this directory"),
     ("add", "a", "Adds a salt bundle to your machine"),
-    ("update", "u", "Update a salt bundle"),
+    // ("clone", "c", "Clones a salt repo and pins it"),
+    // ("update", "u", "Update a salt bundle"),
     ("pin", "p", "pin a folder as a salt bundle"),
     ("open", "o", "open a salt bundle in default file explorer"),
     ("unpin", "unp", "unpin a pinned salt bundle"),
@@ -26,7 +28,7 @@ const INTRINSICS: [(&str, &str, &str); 10] = [
 ];
 
 pub struct Interface {
-    bundles: Vec<SaltBundle>,
+    bundles: Vec<MDBundle>,
     /// this is to check if there is bundle conflict
     bundle_map: BundleMap,
     /// TDOO: dont keep config as optional
@@ -34,6 +36,7 @@ pub struct Interface {
     /// full_config is untouched config which is directly read from config file
     /// it does not get mutated across whole flow
     full_config: Option<SaltConfig>,
+    pub env_vars: HashMap<String, String>,
 }
 
 #[cfg(not(target_os = "windows"))]
@@ -44,6 +47,20 @@ fn clear_screen() {
 #[cfg(target_os = "windows")]
 fn clear_screen() {
     std::process::Command::new("cls").status().unwrap();
+}
+
+fn load_envs(state: &mut Interface) -> Result<()> {
+    state
+        .env_vars
+        .insert("SALT_ARCH".into(), std::env::consts::ARCH.into());
+    state
+        .env_vars
+        .insert("SALT_OS".into(), std::env::consts::OS.into());
+    state.env_vars.insert(
+        "SALT_CWD".into(),
+        std::env::current_dir().unwrap().to_string_lossy().into(),
+    );
+    Ok(())
 }
 
 fn load_config(state: &mut Interface) -> Result<()> {
@@ -80,10 +97,16 @@ fn write_config(c: &SaltConfig) -> Result<()> {
 
 fn load_bundles(state: &mut Interface) -> Result<()> {
     load_current_dir_bundle(state)?;
-    load_added_bundles(state)?;
     load_pinned_bundles(state)?;
 
     Ok(())
+}
+
+fn parse_bundle_from_path(path: &PathBuf) -> Result<MDBundle> {
+    let md_str = std::fs::read_to_string(path).unwrap().to_string();
+    let tokens = markdown::tokenize(&md_str);
+    // TODO: return error if processed is false
+    Ok(crate::app::MDBundle::from(tokens))
 }
 
 fn is_intrinsic_bundle(bundle_name: &str) -> bool {
@@ -97,6 +120,14 @@ fn is_intrinsic_bundle(bundle_name: &str) -> bool {
 
 fn load_current_dir_bundle(state: &mut Interface) -> Result<()> {
     let cwd = std::env::current_dir().unwrap();
+    let saltmd = cwd.join("SALT.md");
+    if !saltmd.exists() {
+        println!("not a salt project or bundle");
+        return Ok(());
+    }
+    let md_str = std::fs::read_to_string(saltmd).unwrap().to_string();
+    let tokens = markdown::tokenize(&md_str);
+
     let mut marked_key = String::new();
     for (k, v) in state.config.as_mut().unwrap().pinned_paths.iter() {
         if v == cwd.to_str().unwrap() {
@@ -113,117 +144,73 @@ fn load_current_dir_bundle(state: &mut Interface) -> Result<()> {
             .pinned_paths
             .remove_entry(&marked_key);
     }
-    if let Ok(curr_bundle_str) = std::fs::read_to_string("./salt.json") {
-        let mut curr_bundle = match serde_json::from_str::<SaltBundle>(&curr_bundle_str) {
-            Ok(b) => b,
-            Err(e) => {
-                return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, e));
-            }
-        };
-        if is_intrinsic_bundle(&curr_bundle.name) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::Unsupported,
-                format!("cannot use {}", curr_bundle.name),
-            ));
-        }
-
-        if state.bundle_map.contains_key(&curr_bundle.name) {
-            println!(
-                "there is a name conflict for bundle: {} at path: ./salt.json",
-                curr_bundle.name
-            );
-            return Ok(());
-        }
-        curr_bundle.exec_path = cwd.clone();
-        curr_bundle.bundle_path = cwd;
-        state.bundles.push(curr_bundle.clone());
-        state
-            .bundle_map
-            .insert(curr_bundle.name.clone(), curr_bundle);
+    let mut curr_bundle = crate::app::MDBundle::from(tokens);
+    if curr_bundle.options.name.is_empty() {
+        println!(
+            "current salt {package} doesn't have a name!",
+            package = curr_bundle.options.typ
+        );
+        return Ok(());
+    }
+    if is_intrinsic_bundle(&curr_bundle.options.name) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::Unsupported,
+            format!(
+                "cannot use name {}, as it is an intrinsic command",
+                curr_bundle.options.name
+            ),
+        ));
     }
 
-    Ok(())
-}
-
-fn load_added_bundles(state: &mut Interface) -> Result<()> {
-    if let Some(home_dir) = home::home_dir() {
-        let salt_cache_dir = std::path::Path::new(home_dir.to_str().unwrap()).join(".salt");
-        if !salt_cache_dir.exists() {
-            std::fs::create_dir(&salt_cache_dir)?;
-        }
-        let paths = std::fs::read_dir(&salt_cache_dir).unwrap();
-        for path in paths {
-            let path_dir = path.unwrap().path();
-            if std::fs::metadata(&path_dir).unwrap().is_dir() {
-                let bundle_json =
-                    std::path::Path::new(path_dir.to_owned().to_str().unwrap()).join("salt.json");
-                if !bundle_json.exists() {
-                    continue;
-                }
-                let bundle_str = std::fs::read_to_string(bundle_json.to_str().unwrap())?;
-                let mut bundle = serde_json::from_str::<SaltBundle>(&bundle_str).unwrap();
-                if is_intrinsic_bundle(bundle.name.as_str()) {
-                    return Err(std::io::Error::new(
-                        std::io::ErrorKind::Unsupported,
-                        format!(
-                            "cannot use {} as a bundle name, it is an intrinsic command",
-                            bundle.name
-                        ),
-                    ));
-                }
-                if state.bundle_map.contains_key(&bundle.name) {
-                    println!(
-                        "there is a name conflict for bundle: {} at path: {}",
-                        bundle.name,
-                        bundle_json.to_str().unwrap()
-                    );
-                    continue;
-                }
-
-                bundle.bundle_path = path_dir;
-                bundle.exec_path = std::env::current_dir().unwrap();
-                state.bundles.push(bundle.clone());
-                state.bundle_map.insert(bundle.name.clone(), bundle);
-            }
-        }
+    if state.bundle_map.contains_key(&curr_bundle.options.name) {
+        println!(
+            "there is a name conflict for bundle: {} at path: ./SALT.md",
+            curr_bundle.options.name
+        );
+        return Ok(());
     }
+    curr_bundle.exec_path = cwd.clone();
+    curr_bundle.bundle_path = cwd;
+    state.bundles.push(curr_bundle.clone());
+    state
+        .bundle_map
+        .insert(curr_bundle.options.name.clone(), curr_bundle);
+
     Ok(())
 }
 
 fn load_pinned_bundles(state: &mut Interface) -> Result<()> {
     for (_, mpath_str) in state.config.as_ref().unwrap().pinned_paths.iter() {
         let mpath = std::path::PathBuf::from(mpath_str);
-        if !mpath.join("salt.json").exists() {
+        if !mpath.join("SALT.md").exists() {
             continue;
         }
-        let bundle_str = std::fs::read_to_string(mpath.join("salt.json"))
-            .expect("cannot read salt bundle file in marked loader");
-        let mut bundle = serde_json::from_str::<SaltBundle>(&bundle_str)
-            .expect("unable to parse salt budle in marked loader");
+
+        let mut bundle = parse_bundle_from_path(&mpath.join("SALT.md"))?;
         bundle.is_pinned = true;
         bundle.bundle_path = mpath.clone();
         bundle.exec_path = mpath.clone();
         // TODO: can be extracted as a function .. the same code is used to
         // load added bundle and
-        if is_intrinsic_bundle(bundle.name.as_str()) {
+        if is_intrinsic_bundle(bundle.options.name.as_str()) {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::Unsupported,
                 format!(
                     "cannot use {} as a bundle name, it is an intrinsic command",
-                    bundle.name
+                    bundle.options.name
                 ),
             ));
         }
-        if state.bundle_map.contains_key(&bundle.name) {
+        if state.bundle_map.contains_key(&bundle.options.name) {
             println!(
                 "there is a name conflict for bundle: {} at path: {}",
-                bundle.name,
+                bundle.options.name,
                 mpath.to_str().unwrap()
             );
             continue;
         }
         state.bundles.push(bundle.clone());
-        state.bundle_map.insert(bundle.name.clone(), bundle);
+        state.bundle_map.insert(bundle.options.name.clone(), bundle);
     }
     Ok(())
 }
@@ -249,7 +236,9 @@ impl Interface {
             bundles: vec![],
             config: None,
             full_config: None,
+            env_vars: HashMap::new(),
         };
+        load_envs(&mut app)?;
         load_config(&mut app)?;
         load_bundles(&mut app)?;
 
@@ -268,7 +257,8 @@ impl Interface {
         Ok(())
     }
 
-    pub fn run(&self, args: &[String]) -> Result<()> {
+    pub fn run(&mut self, args: &[String]) -> Result<()> {
+        self.env_vars.insert("SALT_ARGS".into(), args.join(" "));
         if let Some(bundle) = args.get(1) {
             match bundle.as_str() {
                 "init" | "i" => self.init_bundle()?,
@@ -283,6 +273,7 @@ impl Interface {
                 "pin" | "p" => self.pin_bundle()?,
                 "unpin" | "unp" => self.unpin_bundle(args)?,
                 "jump" | "j" => self.jump_to_bundle(args)?,
+                // "clone" | "c" => self.clone_salt_repo(args)?,
                 // "install" | "-in" => self.install_deps()?,
                 "+" => self.run_wildcard(args)?,
                 "-" => self.run_last_cmd()?,
@@ -337,7 +328,7 @@ impl Interface {
         not_found_err
     }
 
-    fn run_last_cmd(&self) -> Result<()> {
+    fn run_last_cmd(&mut self) -> Result<()> {
         if let Some(home) = home::home_dir() {
             let history_file_path = home.join(".salt").join(".history");
             let cmd_str = std::fs::read_to_string(history_file_path)?;
@@ -359,6 +350,7 @@ impl Interface {
                 std::env::set_current_dir(&bundle.exec_path)?;
                 if let Some(cmd) = args.get(3) {
                     let mut some_cmd = std::process::Command::new(cmd);
+                    some_cmd.envs(&self.env_vars);
                     if let Some(cmd_args) = args.get(4..) {
                         some_cmd.args(cmd_args);
                     }
@@ -375,6 +367,7 @@ impl Interface {
             // I don't know why someone would use it this way but it is better than
             // wasting user's time
             let mut some_cmd = std::process::Command::new(bundle_name);
+            some_cmd.envs(&self.env_vars);
             if let Some(cmd_args) = args.get(3..) {
                 some_cmd.args(cmd_args);
             }
@@ -451,13 +444,10 @@ impl Interface {
                 "not a salt bundle",
             ));
         }
-        let bundle = serde_json::from_str::<SaltBundle>(
-            &std::fs::read_to_string(cwd.join("salt.json")).unwrap(),
-        )
-        .unwrap();
+        let bundle = parse_bundle_from_path(&cwd.join("SALT.md"))?;
         let mut c = self.config.clone().unwrap();
         c.pinned_paths
-            .insert(bundle.name, cwd.to_str().unwrap().into());
+            .insert(bundle.options.name, cwd.to_str().unwrap().into());
         write_config(&c)?;
 
         println!("pinned :: {}", cwd.to_string_lossy());
@@ -483,20 +473,21 @@ impl Interface {
                 args: vec![".".into()],
             },
         );
-        let new_bundle = SaltBundle {
-            name: cwd.file_name().unwrap().to_str().unwrap().to_owned(),
-            requires: Some(vec![]),
-            version: "0.1.0".into(),
-            description: "this is a fresh salt bundle".into(),
-            commands: sample_commands,
-            is_pinned: false,
-            bundle_path: PathBuf::new(),
-            exec_path: PathBuf::new(),
-            watcher: super::Watcher { debounce_secs: 1 },
-        };
-        let new_bundle_string = serde_json::to_string_pretty::<SaltBundle>(&new_bundle).unwrap();
-        let mut file = std::fs::File::create(bundle_file_path)?;
-        file.write_all(new_bundle_string.as_bytes())?;
+        // let new_bundle = SaltBundle {
+        //     name: cwd.file_name().unwrap().to_str().unwrap().to_owned(),
+        //     requires: Some(vec![]),
+        //     typ: "bundle".into(),
+        //     version: "0.1.0".into(),
+        //     description: "this is a fresh salt bundle".into(),
+        //     commands: sample_commands,
+        //     is_pinned: false,
+        //     bundle_path: PathBuf::new(),
+        //     exec_path: PathBuf::new(),
+        //     watcher: super::Watcher { debounce_secs: 1 },
+        // };
+        // let new_bundle_string = serde_json::to_string_pretty::<SaltBundle>(&new_bundle).unwrap();
+        // let mut file = std::fs::File::create(bundle_file_path)?;
+        // file.write_all(new_bundle_string.as_bytes())?;
 
         Ok(())
     }
@@ -517,12 +508,15 @@ impl Interface {
                             .as_ref()
                             .unwrap()
                             .pinned_paths
-                            .get(&b.name)
+                            .get(&b.options.name)
                             .unwrap();
                         std::env::set_current_dir(mbundle_path)?;
                     }
-                    let mut cmd = std::process::Command::new(c.command.clone());
-                    cmd.args(c.args.as_slice());
+                    let mut cmd = std::process::Command::new(
+                        c.command.split(" ").collect::<Vec<&str>>().first().unwrap(),
+                    );
+                    cmd.envs(&self.env_vars);
+                    cmd.args(&c.command.split(" ").collect::<Vec<&str>>()[1..]);
                     cmd.status()?;
                     return Ok(());
                 }
@@ -639,6 +633,7 @@ impl Interface {
             if let Some(command) = bundle.commands.get(args.get(2).unwrap()) {
                 futures::executor::block_on(async {
                     if let Err(e) = async_watch(
+                        self,
                         command,
                         bundle.exec_path.clone(),
                         bundle.watcher.debounce_secs,
@@ -656,8 +651,8 @@ impl Interface {
         ))
     }
 
-    fn display_salt_help(&self, bundles: &Vec<SaltBundle>) {
-        clear_screen();
+    fn display_salt_help(&self, bundles: &Vec<MDBundle>) {
+        // clear_screen();
         let mut help: String = r#" [🧂] gives you superpowers
 version: 0.1.0
     
@@ -684,10 +679,10 @@ Salt commands:
             help.push_str(
                 format!(
                     "{} [{}] {}            - {}\n",
-                    bundle.name,
-                    bundle.version,
+                    bundle.options.name,
+                    "0.1",
                     if bundle.is_pinned { "📌" } else { "" },
-                    bundle.description
+                    bundle.about
                 )
                 .as_str(),
             );
@@ -696,7 +691,7 @@ Salt commands:
         println!("{}", help)
     }
 
-    fn display_bundle_command_help(&self, name: &str, bundle: &SaltBundle) {
+    fn display_bundle_command_help(&self, name: &str, bundle: &MDBundle) {
         clear_screen();
         let mut help: String = format!(
             r#"[🧂 Bundle :: {}]
