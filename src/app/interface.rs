@@ -682,7 +682,7 @@ Salt commands:
                     bundle.options.name,
                     "0.1",
                     if bundle.is_pinned { "📌" } else { "" },
-                    bundle.about
+                    bundle.help
                 )
                 .as_str(),
             );
@@ -694,11 +694,15 @@ Salt commands:
     fn display_bundle_command_help(&self, name: &str, bundle: &MDBundle) {
         clear_screen();
         let mut help: String = format!(
-            r#"[🧂 Bundle :: {}]
+            r#"[🧂 {} :: {}]
+
+{}
     
 Commands:
 "#,
-            name
+            bundle.options.name.to_uppercase(),
+            name,
+            bundle.about
         );
         for (cmd_name, cmd_info) in bundle.commands.iter() {
             help.push_str(format!("{}            - {}\n", cmd_name, cmd_info.about).as_str());

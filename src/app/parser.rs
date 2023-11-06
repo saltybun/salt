@@ -18,6 +18,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
             watcher: Watcher { debounce_secs: 2 },
             commands: HashMap::new(),
             about: String::new(),
+            help: String::from("this is a salt package"),
             is_pinned: false,
             bundle_path: PathBuf::new(),
             exec_path: PathBuf::new(),
@@ -27,6 +28,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
         // mode 1 = processing the body of commands
         // mode 2 = processing docs
         // mode 3 = processing options
+        // mode 3 = processing package help
         let mut mode = 0;
         let mut doc_section = String::new();
         // println!("Values: {:?}", value);
@@ -42,7 +44,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                     }
                     if mode == 0 {
                         let mut cmd_info = String::new();
-                        for span in pspans {
+                        for span in pspans.clone() {
                             match span {
                                 markdown::Span::Text(t) => cmd_info.push_str(&t),
                                 markdown::Span::Code(c) => cmd_info.push_str(&c),
@@ -50,6 +52,17 @@ impl From<Vec<markdown::Block>> for MDBundle {
                             }
                         }
                         bundle.about = cmd_info;
+                    }
+                    if mode == 4 {
+                        let mut cmd_info = String::new();
+                        for span in pspans {
+                            match span {
+                                markdown::Span::Text(t) => cmd_info.push_str(&t),
+                                markdown::Span::Code(c) => cmd_info.push_str(&c),
+                                _ => continue,
+                            }
+                        }
+                        bundle.help = cmd_info;
                     }
                 }
                 Block::Header(h, hsize) => {
@@ -81,6 +94,10 @@ impl From<Vec<markdown::Block>> for MDBundle {
                             markdown::Span::Text(t) => match t.to_lowercase().as_str() {
                                 "about" => {
                                     mode = 0;
+                                    continue;
+                                }
+                                "help" => {
+                                    mode = 4;
                                     continue;
                                 }
                                 "commands" | "command" => {

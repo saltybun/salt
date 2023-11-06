@@ -25,6 +25,7 @@ pub struct MDBundle {
     pub(crate) options: MDOptions,
     pub(crate) commands: HashMap<String, Command>,
     pub(crate) about: String,
+    pub(crate) help: String,
 
     pub is_pinned: bool,
     pub bundle_path: PathBuf,
