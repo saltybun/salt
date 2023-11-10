@@ -63,10 +63,6 @@ pub async fn async_watch<P: AsRef<std::path::Path>>(
 
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
-    use crate::{app::Command, watcher::async_watch};
-
     use super::async_debouncer;
 
     #[test]

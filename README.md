@@ -61,7 +61,6 @@ s popcorn
 - `init` - inits a new `salt.json` file in the current directory with example
   command
 - `add` - adds a bundle to your salt interface
-- `update` - update all added bundles
 - `pin` - pinning the folder as a salt bundle
 - `unpin` - unpin a salt bundle
 - `open` - open a bundle in your default file manager

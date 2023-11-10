@@ -111,7 +111,7 @@ fn parse_bundle_from_path(path: &PathBuf) -> Result<MDBundle> {
 
 fn is_intrinsic_bundle(bundle_name: &str) -> bool {
     for ibundle in INTRINSICS {
-        if ibundle.0 == bundle_name {
+        if ibundle.0 == bundle_name || ibundle.1 == bundle_name {
             return true;
         }
     }
@@ -145,6 +145,7 @@ fn load_current_dir_bundle(state: &mut Interface) -> Result<()> {
             .remove_entry(&marked_key);
     }
     let mut curr_bundle = crate::app::MDBundle::from(tokens);
+    // println!("curr bundle: {curr_bundle:?}");
     if curr_bundle.options.name.is_empty() {
         println!(
             "current salt {package} doesn't have a name!",
@@ -268,7 +269,7 @@ impl Interface {
                     a.rotate_left(1);
                     self.start_watcher(&a)?
                 }
-                "update" | "u" => self.update_bundles()?,
+                // "update" | "u" => self.update_bundles()?,
                 "open" | "o" => self.open_bundle(args)?,
                 "pin" | "p" => self.pin_bundle()?,
                 "unpin" | "unp" => self.unpin_bundle(args)?,
@@ -708,6 +709,6 @@ Commands:
             help.push_str(format!("{}            - {}\n", cmd_name, cmd_info.about).as_str());
         }
 
-        println!("{}", help)
+        println!("{help}")
     }
 }
