@@ -8,10 +8,13 @@ use crate::watcher::async_watch;
 use super::MDBundle;
 use super::{BundleMap, SaltConfig};
 
+static HBS_FILE: &'static str = include_str!("../../templates/salt.hbs");
+
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 9] = [
+const INTRINSICS: [(&str, &str, &str); 10] = [
     ("init", "i", "Initialize new salt bundle in this directory"),
     ("add", "a", "Adds a salt bundle to your machine"),
+    ("doc", "d", "Opens SALT documentation in a HTML page"),
     // ("clone", "c", "Clones a salt repo and pins it"),
     // ("update", "u", "Update a salt bundle"),
     ("pin", "p", "pin a folder as a salt bundle"),
@@ -28,6 +31,7 @@ const INTRINSICS: [(&str, &str, &str); 9] = [
 ];
 
 pub struct Interface {
+    cache_path: PathBuf,
     bundles: Vec<MDBundle>,
     /// this is to check if there is bundle conflict
     bundle_map: BundleMap,
@@ -65,7 +69,8 @@ fn load_envs(state: &mut Interface) -> Result<()> {
 
 fn load_config(state: &mut Interface) -> Result<()> {
     if let Some(home) = home::home_dir() {
-        let salt_config_path = home.join(".salt").join(".config");
+        state.cache_path = home.join(".salt");
+        let salt_config_path = state.cache_path.join(".config");
         if salt_config_path.exists() {
             if let Ok(config_str) = std::fs::read_to_string(salt_config_path) {
                 let c = serde_json::from_str::<SaltConfig>(&config_str)
@@ -105,6 +110,7 @@ fn load_bundles(state: &mut Interface) -> Result<()> {
 fn parse_bundle_from_path(path: &PathBuf) -> Result<MDBundle> {
     let md_str = std::fs::read_to_string(path).unwrap().to_string();
     let tokens = markdown::tokenize(&md_str);
+    // println!("tok: {tokens:?}");
     // TODO: return error if processed is false
     Ok(crate::app::MDBundle::from(tokens))
 }
@@ -233,6 +239,7 @@ fn open_explorer(path: &str) -> Result<()> {
 impl Interface {
     pub fn init() -> Result<Self> {
         let mut app = Self {
+            cache_path: PathBuf::new(),
             bundle_map: HashMap::new(),
             bundles: vec![],
             config: None,
@@ -271,6 +278,7 @@ impl Interface {
                 }
                 // "update" | "u" => self.update_bundles()?,
                 "open" | "o" => self.open_bundle(args)?,
+                "doc" | "d" => self.open_doc(args)?,
                 "pin" | "p" => self.pin_bundle()?,
                 "unpin" | "unp" => self.unpin_bundle(args)?,
                 "jump" | "j" => self.jump_to_bundle(args)?,
@@ -282,6 +290,23 @@ impl Interface {
             }
         } else {
             self.display_salt_help(&self.bundles);
+        }
+
+        Ok(())
+    }
+
+    fn open_doc(&self, args: &[String]) -> Result<()> {
+        if let Some(bundle_name) = args.get(2) {
+            if let Some(bundle) = self.bundle_map.get(bundle_name) {
+                let doc = crate::app::doc::Doc::from(bundle.to_owned());
+                let doc_path = self.cache_path.join(format!("{}.html", bundle_name));
+                let mut reg = handlebars::Handlebars::new();
+                // TODO: handle unwrap
+                reg.register_template_string("salt.hbs", HBS_FILE).unwrap();
+                let html = reg.render("salt.hbs", &doc).unwrap();
+                std::fs::write(doc_path.clone(), html)?;
+                webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
+            }
         }
 
         Ok(())
@@ -397,43 +422,6 @@ impl Interface {
         let bundle_name = self.get_bundle_name(bundle_link.unwrap())?;
         // clone the git repository provided
         self.clone_bundle(bundle_link.unwrap(), &bundle_name)?;
-        Ok(())
-    }
-
-    fn update_bundles(&self) -> Result<()> {
-        if let Some(home) = home::home_dir() {
-            let salt_cache_dir = std::path::Path::new(home.to_str().unwrap()).join(".salt");
-            if !salt_cache_dir.exists() {
-                std::fs::create_dir(&salt_cache_dir)?;
-                return Err(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "no added salt bundles",
-                ));
-            }
-            let paths = std::fs::read_dir(&salt_cache_dir).unwrap();
-            for path in paths {
-                let path_dir = path.unwrap();
-                if path_dir.path().is_dir() {
-                    std::env::set_current_dir(path_dir.path())?;
-                    let mut pull_cmd = std::process::Command::new("git");
-                    pull_cmd.args(["pull", "origin", "main"]);
-                    match pull_cmd.status()?.code() {
-                        Some(0) => {
-                            println!(
-                                "{} :: updated",
-                                path_dir.path().file_name().unwrap().to_string_lossy()
-                            );
-                        }
-                        _ => {
-                            return Err(std::io::Error::new(
-                                std::io::ErrorKind::Interrupted,
-                                "failed to run pull command",
-                            ));
-                        }
-                    }
-                }
-            }
-        }
         Ok(())
     }
 

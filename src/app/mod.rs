@@ -2,6 +2,7 @@ use std::{collections::HashMap, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 
+pub(crate) mod doc;
 pub(crate) mod interface;
 pub(crate) mod parser;
 

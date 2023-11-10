@@ -34,6 +34,24 @@ impl From<Vec<markdown::Block>> for MDBundle {
         // println!("Values: {:?}", value);
         for block in value {
             match block {
+                Block::OrderedList(li, li_type) => {
+                    if !doc_section.is_empty() && mode == 2 {
+                        bundle
+                            .docs
+                            .entry(doc_section.clone())
+                            .and_modify(|e| e.push(Block::OrderedList(li, li_type)));
+                        continue;
+                    }
+                }
+                Block::CodeBlock(copt, code) => {
+                    if !doc_section.is_empty() && mode == 2 {
+                        bundle
+                            .docs
+                            .entry(doc_section.clone())
+                            .and_modify(|e| e.push(Block::CodeBlock(copt, code)));
+                        continue;
+                    }
+                }
                 Block::Paragraph(pspans) => {
                     if !doc_section.is_empty() && mode == 2 {
                         bundle
@@ -64,6 +82,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                         }
                         bundle.help = cmd_info;
                     }
+                    continue;
                 }
                 Block::Header(h, hsize) => {
                     // println!("header : {h:?}");
@@ -74,12 +93,19 @@ impl From<Vec<markdown::Block>> for MDBundle {
                     if hsize == 2 as usize && h.len() != 1 {
                         return bundle;
                     }
+                    if !doc_section.is_empty() && hsize == 4 as usize {
+                        bundle
+                            .docs
+                            .entry(doc_section.clone())
+                            .and_modify(|e| e.push(Block::Header(h.clone(), 4 as usize)));
+                        continue;
+                    }
                     if hsize == 3 as usize {
                         mode = 2;
                         match h.first().unwrap() {
                             markdown::Span::Text(t) => {
                                 doc_section = t.to_owned();
-                                bundle.docs.insert(t.to_owned(), Vec::new());
+                                bundle.docs.entry(t.to_owned()).or_insert(Vec::new());
                             }
                             _ => {
                                 return bundle;
@@ -119,6 +145,13 @@ impl From<Vec<markdown::Block>> for MDBundle {
                     }
                 }
                 Block::UnorderedList(items) => {
+                    if !doc_section.is_empty() && mode == 2 {
+                        bundle
+                            .docs
+                            .entry(doc_section.clone())
+                            .and_modify(|e| e.push(Block::UnorderedList(items)));
+                        continue;
+                    }
                     if mode == 1 {
                         for item in items {
                             match item {

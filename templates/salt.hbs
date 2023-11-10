@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <title>SALT | {{ project }}</title>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,700;1,300;1,700&display=swap');
+
+        body {
+            background-image: radial-gradient(circle farthest-corner at 10% 20%, rgba(234, 249, 249, 0.67) 0.1%, rgba(239, 249, 251, 0.63) 90.1%);
+            font-family: 'Poppins', sans-serif !important;
+            color: rgb(72, 82, 92) !important;
+        }
+
+        .navbar .navbar-light {
+            background-color: transparent !important;
+        }
+
+        .nav-pills .nav-link.active,
+        .nav-pills .show>.nav-link {
+            color: white !important;
+            background-color: slateblue !important;
+        }
+
+        .nav-brand>b {
+            color: rgb(74, 85, 95) !important;
+        }
+
+        a {
+            color: slateblue !important;
+        }
+
+        h4 {
+            font-weight: bold !important;
+            color: rgb(74, 85, 95) !important;
+        }
+
+        code {
+            color: slateblue !important;
+            background-color: #ececee !important;
+        }
+
+        #s-nav-heading {
+            padding: 1em;
+        }
+
+        pre {
+            margin-top: 1em !important;
+            margin-bottom: 1em !important;
+            border: 1px solid #d7d7d7;
+            border-radius: 5px !important;
+            background-color: #ececee !important;
+            padding: 1em !important;
+        }
+    </style>
+
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/css/bootstrap.min.css"
+        integrity="sha384-Gn5384xqQ1aoWXA+058RXPxPg6fy4IWvTNh0E263XmFcJlSAwiGgFAW/dAiS6JXm" crossorigin="anonymous">
+</head>
+
+
+<body>
+
+    <div class="container-fluid">
+        <nav class="navbar navbar-light">
+            <div class="navbar-brand">
+                🧂 <b>Docs</b>
+            </div>
+        </nav>
+
+        <div class="row">
+            <div class="col-3">
+                <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+                    {{ #each titles }}
+                    <a class="nav-link {{this.2}}" id="{{this.1}}-tab" data-toggle="pill" href="#{{this.1}}" role="tab"
+                        aria-controls="{{this.1}}" aria-selected="true">
+                        {{{this.0}}}
+                    </a>
+                    {{/each}}
+
+                    <div id="s-nav-heading">
+                        <b>Meta</b>
+                    </div>
+                    <a class="nav-link" id="about-tab" data-toggle="pill" href="#about" role="tab" aria-controls="about"
+                        aria-selected="true">
+                        About
+                    </a>
+                    <a class="nav-link" id="commands-tab" data-toggle="pill" href="#commands" role="tab"
+                        aria-controls="commands" aria-selected="true">
+                        Commands
+                    </a>
+                </div>
+
+                {{!-- <div id="s-nav-heading">
+                    <b>Meta</b>
+                </div> --}}
+            </div>
+            <div class="col-8">
+                <div class="tab-content" id="v-pills-tabContent">
+                    {{#each contents}}
+                    <div class="tab-pane {{this.2}}" id="{{this.1}}" role="tabpanel" aria-labelledby="{{this.1}}-tab">
+                        {{{this.0}}}
+                    </div>
+                    {{/each}}
+
+                    <div class="tab-pane" id="about" role="tabpanel" aria-labelledby="about-tab">
+                        <h4>About project</h4>
+                        {{about}}
+                    </div>
+
+                    <div class="tab-pane" id="commands" role="tabpanel" aria-labelledby="commands-tab">
+                        <h4>Project Commands</h4>
+                        {{#each commands}}
+                        <code>{{this.0}}</code> - {{this.1}}
+                        <br />
+                        {{/each}}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"
+        integrity="sha384-KJ3o2DKtIkvYIK3UENzmM7KCkRr/rE9/Qpg6aAZGJwFDMVNA/GpGFF93hXpG5KkN"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.12.9/dist/umd/popper.min.js"
+        integrity="sha384-ApNbgh9B+Y1QKtv3Rn7W3mgPxhU9K/ScQsAP7hUibX39j7fakFPskvXusvfa0b4Q"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.0.0/dist/js/bootstrap.min.js"
+        integrity="sha384-JZR6Spejh4U02d8jOt6vLEHfe/JQGiRRSQQxSfFWpi1MquVdAyjUar5+76PVCmYl"
+        crossorigin="anonymous"></script>
+</body>
+
+</html>
