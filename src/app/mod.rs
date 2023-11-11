@@ -21,8 +21,9 @@ pub(crate) struct MDOptions {
 
 #[derive(Debug, Clone)]
 pub struct MDBundle {
+    pub(crate) version: String,
     pub(crate) processed: bool,
-    pub(crate) docs: HashMap<String, Vec<markdown::Block>>,
+    pub(crate) docs: indexmap::IndexMap<String, Vec<markdown::Block>>,
     pub(crate) options: MDOptions,
     pub(crate) commands: HashMap<String, Command>,
     pub(crate) about: String,

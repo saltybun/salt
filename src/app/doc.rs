@@ -10,6 +10,7 @@ use super::MDBundle;
 
 #[derive(Serialize, Deserialize)]
 pub struct Doc {
+    version: String,
     project: String,
     titles: Vec<(String, String, String)>,
     contents: Vec<(String, String, String)>,
@@ -38,8 +39,14 @@ fn spans_to_html(spans: &Vec<Span>) -> String {
             }
             markdown::Span::Link(_, _, _) => todo!(),
             markdown::Span::Image(_, _, _) => todo!(),
-            markdown::Span::Emphasis(_) => todo!(),
-            markdown::Span::Strong(_) => todo!(),
+            markdown::Span::Emphasis(ispans) => {
+                let emph_html = spans_to_html(ispans);
+                html.push_str(&format!("<i>{}</i>", &emph_html));
+            }
+            markdown::Span::Strong(spans) => {
+                let strong_html = spans_to_html(spans);
+                html.push_str(&format!("<b>{}</b>", &strong_html));
+            }
         }
     }
 
@@ -49,6 +56,11 @@ fn spans_to_html(spans: &Vec<Span>) -> String {
 fn blocks_to_html(html: &mut String, blocks: &Vec<Block>) {
     for block in blocks {
         match block {
+            Block::Blockquote(bq) => {
+                html.push_str(r#"<div class="bq">"#);
+                blocks_to_html(html, bq);
+                html.push_str("</div>");
+            }
             Block::Header(h, _) => {
                 html.push_str("<h4>");
                 html.push_str(&spans_to_html(h));
@@ -57,9 +69,6 @@ fn blocks_to_html(html: &mut String, blocks: &Vec<Block>) {
             Block::Paragraph(spans) => {
                 html.push_str(&spans_to_html(spans));
             }
-            // Block::Blockquote(quote) => {
-
-            // },
             Block::CodeBlock(_lang, cblock) => {
                 html.push_str(&format!("<pre>{cblock}</pre>"));
             }
@@ -112,6 +121,7 @@ fn get_html(blocks: &Vec<Block>) -> String {
 impl From<MDBundle> for Doc {
     fn from(value: MDBundle) -> Self {
         let mut doc = Doc {
+            version: value.version.clone(),
             project: value.options.name,
             contents: vec![],
             titles: vec![],

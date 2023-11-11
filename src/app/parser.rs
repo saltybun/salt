@@ -1,16 +1,17 @@
 use std::{collections::HashMap, path::PathBuf};
 
+use super::{Command, MDBundle, MDOptions};
+use crate::app::Watcher;
 use markdown::Block;
 
-use crate::app::Watcher;
-
-use super::{Command, MDBundle, MDOptions};
+static VERSION: &'static str = "0.1.0";
 
 impl From<Vec<markdown::Block>> for MDBundle {
     fn from(value: Vec<markdown::Block>) -> Self {
         let mut bundle = MDBundle {
+            version: VERSION.to_owned(),
             processed: false,
-            docs: HashMap::new(),
+            docs: indexmap::IndexMap::new(),
             options: MDOptions {
                 typ: "bundle".into(),
                 name: String::new(),
@@ -142,6 +143,15 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                 return bundle;
                             }
                         }
+                    }
+                }
+                Block::Blockquote(bq) => {
+                    if !doc_section.is_empty() && mode == 2 {
+                        bundle
+                            .docs
+                            .entry(doc_section.clone())
+                            .and_modify(|e| e.push(Block::Blockquote(bq)));
+                        continue;
                     }
                 }
                 Block::UnorderedList(items) => {

@@ -9,12 +9,14 @@ use super::MDBundle;
 use super::{BundleMap, SaltConfig};
 
 static HBS_FILE: &'static str = include_str!("../../templates/salt.hbs");
+static SALTMD_STR: &'static str = include_str!("../../SALT.md");
 
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 10] = [
+const INTRINSICS: [(&str, &str, &str); 11] = [
     ("init", "i", "Initialize new salt bundle in this directory"),
     ("add", "a", "Adds a salt bundle to your machine"),
     ("doc", "d", "Opens SALT documentation in a HTML page"),
+    ("help", "h", "Shows salt docs for help with commands"),
     // ("clone", "c", "Clones a salt repo and pins it"),
     // ("update", "u", "Update a salt bundle"),
     ("pin", "p", "pin a folder as a salt bundle"),
@@ -133,6 +135,7 @@ fn load_current_dir_bundle(state: &mut Interface) -> Result<()> {
     }
     let md_str = std::fs::read_to_string(saltmd).unwrap().to_string();
     let tokens = markdown::tokenize(&md_str);
+    // println!("tokens: {tokens:?}");
 
     let mut marked_key = String::new();
     for (k, v) in state.config.as_mut().unwrap().pinned_paths.iter() {
@@ -295,8 +298,26 @@ impl Interface {
         Ok(())
     }
 
+    fn open_doc_from_web(&self, link: &str) -> Result<()> {
+        if link.contains("github.com") {
+            let mut raw_gh_link = link.replace("github.com", "raw.githubusercontent.com");
+            if !raw_gh_link.ends_with("SALT.md") && !raw_gh_link.ends_with("/") {
+                raw_gh_link.push_str("/main/SALT.md");
+            } else if !raw_gh_link.ends_with("SALT.md") {
+                raw_gh_link.push_str("SALT.md");
+            }
+            println!("hitting: {}", raw_gh_link);
+            let resp = reqwest::blocking::get(raw_gh_link).unwrap().text().unwrap();
+            println!("doc: {}", resp);
+        }
+        Ok(())
+    }
+
     fn open_doc(&self, args: &[String]) -> Result<()> {
         if let Some(bundle_name) = args.get(2) {
+            if bundle_name.starts_with("https") || bundle_name.starts_with("http") {
+                return self.open_doc_from_web(bundle_name);
+            }
             if let Some(bundle) = self.bundle_map.get(bundle_name) {
                 let doc = crate::app::doc::Doc::from(bundle.to_owned());
                 let doc_path = self.cache_path.join(format!("{}.html", bundle_name));
@@ -306,7 +327,24 @@ impl Interface {
                 let html = reg.render("salt.hbs", &doc).unwrap();
                 std::fs::write(doc_path.clone(), html)?;
                 webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
+            } else {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "no such bundle",
+                ));
             }
+        } else if std::env::current_dir()?.join("SALT.md").exists() {
+            let bundle = parse_bundle_from_path(&std::env::current_dir()?.join("SALT.md"))?;
+            let doc = crate::app::doc::Doc::from(bundle.to_owned());
+            let doc_path = self
+                .cache_path
+                .join(format!("{}.html", bundle.options.name));
+            let mut reg = handlebars::Handlebars::new();
+            // TODO: handle unwrap
+            reg.register_template_string("salt.hbs", HBS_FILE).unwrap();
+            let html = reg.render("salt.hbs", &doc).unwrap();
+            std::fs::write(doc_path.clone(), html)?;
+            webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
         }
 
         Ok(())
@@ -427,7 +465,7 @@ impl Interface {
 
     fn pin_bundle(&self) -> Result<()> {
         let cwd = std::env::current_dir()?;
-        if !cwd.join("salt.json").exists() {
+        if !cwd.join("SALT.md").exists() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "not a salt bundle",
@@ -445,39 +483,15 @@ impl Interface {
 
     fn init_bundle(&self) -> Result<()> {
         let cwd = std::env::current_dir()?;
-        let bundle_file_path = cwd.join("salt.json");
+        let bundle_file_path = cwd.join("SALT.md");
         if bundle_file_path.exists() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::AlreadyExists,
                 "already a salt bundle!",
             ));
         }
-
-        let mut sample_commands = HashMap::new();
-        sample_commands.insert(
-            String::from("fp"),
-            crate::app::Command {
-                about: "prints all file paths in this directory".into(),
-                command: "find".into(),
-                args: vec![".".into()],
-            },
-        );
-        // let new_bundle = SaltBundle {
-        //     name: cwd.file_name().unwrap().to_str().unwrap().to_owned(),
-        //     requires: Some(vec![]),
-        //     typ: "bundle".into(),
-        //     version: "0.1.0".into(),
-        //     description: "this is a fresh salt bundle".into(),
-        //     commands: sample_commands,
-        //     is_pinned: false,
-        //     bundle_path: PathBuf::new(),
-        //     exec_path: PathBuf::new(),
-        //     watcher: super::Watcher { debounce_secs: 1 },
-        // };
-        // let new_bundle_string = serde_json::to_string_pretty::<SaltBundle>(&new_bundle).unwrap();
-        // let mut file = std::fs::File::create(bundle_file_path)?;
-        // file.write_all(new_bundle_string.as_bytes())?;
-
+        let mut file = std::fs::File::create(bundle_file_path)?;
+        file.write_all(SALTMD_STR.as_bytes())?;
         Ok(())
     }
 
