@@ -32,7 +32,9 @@ fn spans_to_html(spans: &Vec<Span>) -> String {
                 html.push_str("<br />");
             }
             markdown::Span::Text(t) => {
-                html.push_str(&t);
+                if !t.starts_with("<!--") {
+                    html.push_str(&t);
+                }
             }
             markdown::Span::Code(c) => {
                 html.push_str(&format!("<code>{c}</code>"));

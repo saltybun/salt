@@ -29,7 +29,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
         // mode 1 = processing the body of commands
         // mode 2 = processing docs
         // mode 3 = processing options
-        // mode 3 = processing package help
+        // mode 4 = processing package help
         let mut mode = 0;
         let mut doc_section = String::new();
         // println!("Values: {:?}", value);
@@ -76,12 +76,18 @@ impl From<Vec<markdown::Block>> for MDBundle {
                         let mut cmd_info = String::new();
                         for span in pspans {
                             match span {
-                                markdown::Span::Text(t) => cmd_info.push_str(&t),
+                                markdown::Span::Text(t) => {
+                                    if !t.starts_with("<!--") {
+                                        cmd_info.push_str(&t)
+                                    }
+                                }
                                 markdown::Span::Code(c) => cmd_info.push_str(&c),
                                 _ => continue,
                             }
                         }
-                        bundle.help = cmd_info;
+                        if !cmd_info.is_empty() {
+                            bundle.help = cmd_info;
+                        }
                     }
                     continue;
                 }

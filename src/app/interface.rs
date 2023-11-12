@@ -307,8 +307,27 @@ impl Interface {
                 raw_gh_link.push_str("SALT.md");
             }
             println!("hitting: {}", raw_gh_link);
-            let resp = reqwest::blocking::get(raw_gh_link).unwrap().text().unwrap();
-            println!("doc: {}", resp);
+            let resp = reqwest::blocking::get(&raw_gh_link)
+                .unwrap()
+                .text()
+                .unwrap();
+            let tokens = markdown::tokenize(&resp);
+            let bundle = crate::app::MDBundle::from(tokens);
+            let doc = crate::app::doc::Doc::from(bundle);
+            let doc_html_name = raw_gh_link
+                .replace("https://", "")
+                .replace("http://", "")
+                .replace("/", "")
+                .replace("raw.githubusercontent.com", "")
+                .trim_start_matches("-")
+                .to_owned();
+            let doc_path = self.cache_path.join(format!("{}.html", doc_html_name));
+            let mut reg = handlebars::Handlebars::new();
+            // TODO: handle unwrap
+            reg.register_template_string("salt.hbs", HBS_FILE).unwrap();
+            let html = reg.render("salt.hbs", &doc).unwrap();
+            std::fs::write(doc_path.clone(), html)?;
+            webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
         }
         Ok(())
     }
