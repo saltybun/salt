@@ -12,11 +12,10 @@ static HBS_FILE: &'static str = include_str!("../../templates/salt.hbs");
 static SALTMD_STR: &'static str = include_str!("../../SALT.md");
 
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 11] = [
+const INTRINSICS: [(&str, &str, &str); 10] = [
     ("init", "i", "Initialize new salt bundle in this directory"),
     ("add", "a", "Adds a salt bundle to your machine"),
-    ("doc", "d", "Opens SALT documentation in a HTML page"),
-    ("help", "h", "Shows salt docs for help with commands"),
+    ("doc", "d", "Opens SALT package doc as a HTML page"),
     // ("clone", "c", "Clones a salt repo and pins it"),
     // ("update", "u", "Update a salt bundle"),
     ("pin", "p", "pin a folder as a salt bundle"),
@@ -332,8 +331,32 @@ impl Interface {
         Ok(())
     }
 
+    fn open_salt_doc(&self) -> Result<()> {
+        let salt_html_fname = format!("salt-help-{}.html", crate::app::parser::VERSION);
+        let tokens = markdown::tokenize(SALTMD_STR);
+        let bundle = crate::app::MDBundle::from(tokens);
+        let doc = crate::app::doc::Doc::from(bundle.to_owned());
+        let doc_path = self.cache_path.join(salt_html_fname);
+        // short circuit if doc is already there for the current version of salt
+        if doc_path.exists() {
+            // TODO: handle unwrap
+            webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
+            return Ok(());
+        }
+        let mut reg = handlebars::Handlebars::new();
+        // TODO: handle unwrap
+        reg.register_template_string("salt.hbs", HBS_FILE).unwrap();
+        let html = reg.render("salt.hbs", &doc).unwrap();
+        std::fs::write(doc_path.clone(), html)?;
+        webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
+        Ok(())
+    }
+
     fn open_doc(&self, args: &[String]) -> Result<()> {
         if let Some(bundle_name) = args.get(2) {
+            if bundle_name.eq("help") {
+                return self.open_salt_doc();
+            }
             if bundle_name.starts_with("https") || bundle_name.starts_with("http") {
                 return self.open_doc_from_web(bundle_name);
             }

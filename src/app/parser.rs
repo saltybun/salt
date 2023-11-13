@@ -4,7 +4,7 @@ use super::{Command, MDBundle, MDOptions};
 use crate::app::Watcher;
 use markdown::Block;
 
-static VERSION: &'static str = "0.1.0";
+pub static VERSION: &'static str = "0.1.0";
 
 impl From<Vec<markdown::Block>> for MDBundle {
     fn from(value: Vec<markdown::Block>) -> Self {
