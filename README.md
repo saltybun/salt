@@ -13,8 +13,23 @@ scripts from any folder or a git repository.
 
 ## Install 🧂
 
-## Reading salt docs with salt
+- Go to [releases page]()
+- Download and unzip the archive
+- Copy and paste `s` binary to your `$PATH`
+
+> Newer releases will have an installer. That is not on focus right now. You can
+> contribute to this [issue]() for building a install script.
+
+## Power of salt docs
 
 ```
-s help
+s d help
 ```
+
+## Platform Support
+
+| Platform | Build | Tested |
+| -------- | ----- | ------ |
+| Windows  | ✅    | ❌     |
+| Linux    | ✅    | ✅     |
+| OSX      | ✅    | ✅     |
