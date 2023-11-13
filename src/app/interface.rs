@@ -11,11 +11,14 @@ use super::{BundleMap, SaltConfig};
 static HBS_FILE: &'static str = include_str!("../../templates/salt.hbs");
 static SALTMD_STR: &'static str = include_str!("../../SALT.md");
 
+static SALT_HBS_NAME: &'static str = "salt.hbs";
+
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 10] = [
+const INTRINSICS: [(&str, &str, &str); 11] = [
     ("init", "i", "Initialize new salt bundle in this directory"),
     ("add", "a", "Adds a salt bundle to your machine"),
     ("doc", "d", "Opens SALT package doc as a HTML page"),
+    ("edit", "e", "Open the project/bundle in your editor"),
     // ("clone", "c", "Clones a salt repo and pins it"),
     // ("update", "u", "Update a salt bundle"),
     ("pin", "p", "pin a folder as a salt bundle"),
@@ -81,6 +84,7 @@ fn load_config(state: &mut Interface) -> Result<()> {
             }
         } else {
             let cfg = SaltConfig {
+                editor: Some("vi".into()),
                 pinned_paths: HashMap::new(),
             };
             write_config(&cfg)?;
@@ -238,6 +242,10 @@ fn open_explorer(path: &str) -> Result<()> {
     Ok(())
 }
 
+fn is_cwd_salt_bundle() -> Result<bool> {
+    return Ok(std::env::current_dir()?.join("SALT.md").exists());
+}
+
 impl Interface {
     pub fn init() -> Result<Self> {
         let mut app = Self {
@@ -278,6 +286,7 @@ impl Interface {
                     a.rotate_left(1);
                     self.start_watcher(&a)?
                 }
+                "edit" | "e" => self.open_editor(args)?,
                 // "update" | "u" => self.update_bundles()?,
                 "open" | "o" => self.open_bundle(args)?,
                 "doc" | "d" => self.open_doc(args)?,
@@ -294,6 +303,28 @@ impl Interface {
             self.display_salt_help(&self.bundles);
         }
 
+        Ok(())
+    }
+
+    fn open_editor(&self, args: &[String]) -> Result<()> {
+        let config = self.config.as_ref().unwrap();
+        if config.editor.is_none() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "add your editor config to $HOME/.salt/.config",
+            ));
+        }
+        if let Some(bundle_name) = args.get(2) {
+            if let Some(bundle) = self.bundle_map.get(bundle_name) {
+                let mut editor_cmd = std::process::Command::new(config.editor.as_ref().unwrap());
+                editor_cmd.arg(bundle.exec_path.to_str().unwrap());
+                editor_cmd.status()?;
+            }
+        } else if is_cwd_salt_bundle()? {
+            let mut editor_cmd = std::process::Command::new(config.editor.as_ref().unwrap());
+            editor_cmd.arg(std::env::current_dir().unwrap());
+            editor_cmd.status()?;
+        }
         Ok(())
     }
 
@@ -323,8 +354,9 @@ impl Interface {
             let doc_path = self.cache_path.join(format!("{}.html", doc_html_name));
             let mut reg = handlebars::Handlebars::new();
             // TODO: handle unwrap
-            reg.register_template_string("salt.hbs", HBS_FILE).unwrap();
-            let html = reg.render("salt.hbs", &doc).unwrap();
+            reg.register_template_string(SALT_HBS_NAME, HBS_FILE)
+                .unwrap();
+            let html = reg.render(SALT_HBS_NAME, &doc).unwrap();
             std::fs::write(doc_path.clone(), html)?;
             webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
         }
@@ -338,6 +370,7 @@ impl Interface {
         let doc = crate::app::doc::Doc::from(bundle.to_owned());
         let doc_path = self.cache_path.join(salt_html_fname);
         // short circuit if doc is already there for the current version of salt
+        #[cfg(not(debug_assertions))]
         if doc_path.exists() {
             // TODO: handle unwrap
             webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
@@ -345,8 +378,9 @@ impl Interface {
         }
         let mut reg = handlebars::Handlebars::new();
         // TODO: handle unwrap
-        reg.register_template_string("salt.hbs", HBS_FILE).unwrap();
-        let html = reg.render("salt.hbs", &doc).unwrap();
+        reg.register_template_string(SALT_HBS_NAME, HBS_FILE)
+            .unwrap();
+        let html = reg.render(SALT_HBS_NAME, &doc).unwrap();
         std::fs::write(doc_path.clone(), html)?;
         webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
         Ok(())
@@ -365,8 +399,9 @@ impl Interface {
                 let doc_path = self.cache_path.join(format!("{}.html", bundle_name));
                 let mut reg = handlebars::Handlebars::new();
                 // TODO: handle unwrap
-                reg.register_template_string("salt.hbs", HBS_FILE).unwrap();
-                let html = reg.render("salt.hbs", &doc).unwrap();
+                reg.register_template_string(SALT_HBS_NAME, HBS_FILE)
+                    .unwrap();
+                let html = reg.render(SALT_HBS_NAME, &doc).unwrap();
                 std::fs::write(doc_path.clone(), html)?;
                 webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
             } else {
@@ -383,8 +418,9 @@ impl Interface {
                 .join(format!("{}.html", bundle.options.name));
             let mut reg = handlebars::Handlebars::new();
             // TODO: handle unwrap
-            reg.register_template_string("salt.hbs", HBS_FILE).unwrap();
-            let html = reg.render("salt.hbs", &doc).unwrap();
+            reg.register_template_string(SALT_HBS_NAME, HBS_FILE)
+                .unwrap();
+            let html = reg.render(SALT_HBS_NAME, &doc).unwrap();
             std::fs::write(doc_path.clone(), html)?;
             webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
         }

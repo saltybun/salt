@@ -41,6 +41,7 @@ pub struct Watcher {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct SaltConfig {
+    pub editor: Option<String>,
     pub pinned_paths: HashMap<String, String>,
 }
 
