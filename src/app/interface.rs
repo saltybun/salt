@@ -9,9 +9,11 @@ use super::MDBundle;
 use super::{BundleMap, SaltConfig};
 
 static HBS_FILE: &'static str = include_str!("../../templates/salt.hbs");
+static INIT_HBS_FILE: &'static str = include_str!("../../templates/init.hbs");
 static SALTMD_STR: &'static str = include_str!("../../SALT.md");
 
 static SALT_HBS_NAME: &'static str = "salt.hbs";
+static INIT_HBS_NAME: &'static str = "init.hbs";
 
 /// INTRINSICS are commands which are internal to salt bundler
 const INTRINSICS: [(&str, &str, &str); 11] = [
@@ -99,7 +101,7 @@ fn write_config(c: &SaltConfig) -> Result<()> {
     if let Some(home) = home::home_dir() {
         let cfg_path = home.join(".salt").join(".config");
         let mut cfg_file = std::fs::File::create(cfg_path)?;
-        let c = serde_json::to_string(&c).unwrap();
+        let c = serde_json::to_string_pretty(&c).unwrap();
         cfg_file.write_all(c.as_bytes())?;
     }
     Ok(())
@@ -561,6 +563,7 @@ impl Interface {
 
     fn init_bundle(&self) -> Result<()> {
         let cwd = std::env::current_dir()?;
+        let folder_name = cwd.file_name().unwrap().to_str().unwrap();
         let bundle_file_path = cwd.join("SALT.md");
         if bundle_file_path.exists() {
             return Err(std::io::Error::new(
@@ -568,8 +571,12 @@ impl Interface {
                 "already a salt bundle!",
             ));
         }
-        let mut file = std::fs::File::create(bundle_file_path)?;
-        file.write_all(SALTMD_STR.as_bytes())?;
+        let mut reg = handlebars::Handlebars::new();
+        // TODO: handle unwrap
+        reg.register_template_string(INIT_HBS_NAME, INIT_HBS_FILE)
+            .unwrap();
+        let html = reg.render(INIT_HBS_NAME, &folder_name).unwrap();
+        std::fs::write(bundle_file_path, html)?;
         Ok(())
     }
 
