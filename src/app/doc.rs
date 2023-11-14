@@ -39,7 +39,9 @@ fn spans_to_html(spans: &Vec<Span>) -> String {
             markdown::Span::Code(c) => {
                 html.push_str(&format!("<code>{c}</code>"));
             }
-            markdown::Span::Link(_, _, _) => todo!(),
+            markdown::Span::Link(text, link, _) => {
+                html.push_str(&format!(r#"<a href="{link}" target="_blank">{text}</a>"#));
+            }
             markdown::Span::Image(_, _, _) => todo!(),
             markdown::Span::Emphasis(ispans) => {
                 let emph_html = spans_to_html(ispans);
