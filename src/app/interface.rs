@@ -8,19 +8,20 @@ use crate::watcher::async_watch;
 use super::MDBundle;
 use super::{BundleMap, SaltConfig};
 
-static HBS_FILE: &'static str = include_str!("../../templates/salt.hbs");
-static INIT_HBS_FILE: &'static str = include_str!("../../templates/init.hbs");
-static SALTMD_STR: &'static str = include_str!("../../SALT.md");
+static HBS_FILE: &str = include_str!("../../templates/salt.hbs");
+static INIT_HBS_FILE: &str = include_str!("../../templates/init.hbs");
+static SALTMD_STR: &str = include_str!("../../SALT.md");
 
-static SALT_HBS_NAME: &'static str = "salt.hbs";
-static INIT_HBS_NAME: &'static str = "init.hbs";
+static SALT_HBS_NAME: &str = "salt.hbs";
+static INIT_HBS_NAME: &str = "init.hbs";
 
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 11] = [
+const INTRINSICS: [(&str, &str, &str); 12] = [
     ("init", "i", "Initialize new salt bundle in this directory"),
     ("add", "a", "Adds a salt bundle to your machine"),
     ("doc", "d", "Opens SALT package doc as a HTML page"),
     ("edit", "e", "Open the project/bundle in your editor"),
+    ("workspace", "ws", "Load workspace into salt memory"),
     // ("clone", "c", "Clones a salt repo and pins it"),
     // ("update", "u", "Update a salt bundle"),
     ("pin", "p", "pin a folder as a salt bundle"),
@@ -77,21 +78,24 @@ fn load_config(state: &mut Interface) -> Result<()> {
     if let Some(home) = home::home_dir() {
         state.cache_path = home.join(".salt");
         let salt_config_path = state.cache_path.join(".config");
-        if salt_config_path.exists() {
-            if let Ok(config_str) = std::fs::read_to_string(salt_config_path) {
-                let c = serde_json::from_str::<SaltConfig>(&config_str)
-                    .expect("error while reading salt config");
-                state.config = Some(c.clone());
-                state.full_config = Some(c);
+        match salt_config_path.exists() {
+            true => {
+                if let Ok(config_str) = std::fs::read_to_string(salt_config_path) {
+                    let c = serde_json::from_str::<SaltConfig>(&config_str)
+                        .expect("error while reading salt config");
+                    state.config = Some(c.clone());
+                    state.full_config = Some(c);
+                }
             }
-        } else {
-            let cfg = SaltConfig {
-                editor: Some("vi".into()),
-                pinned_paths: HashMap::new(),
-            };
-            write_config(&cfg)?;
-            state.config = Some(cfg.clone());
-            state.full_config = Some(cfg);
+            false => {
+                let cfg = SaltConfig {
+                    editor: Some("vi".into()),
+                    pinned_paths: HashMap::new(),
+                };
+                write_config(&cfg)?;
+                state.config = Some(cfg.clone());
+                state.full_config = Some(cfg);
+            }
         }
     }
     Ok(())
@@ -245,7 +249,7 @@ fn open_explorer(path: &str) -> Result<()> {
 }
 
 fn is_cwd_salt_bundle() -> Result<bool> {
-    return Ok(std::env::current_dir()?.join("SALT.md").exists());
+    Ok(std::env::current_dir()?.join("SALT.md").exists())
 }
 
 impl Interface {
@@ -279,8 +283,8 @@ impl Interface {
 
     pub fn run(&mut self, args: &[String]) -> Result<()> {
         self.env_vars.insert("SALT_ARGS".into(), args.join(" "));
-        if let Some(bundle) = args.get(1) {
-            match bundle.as_str() {
+        if let Some(command) = args.get(1) {
+            match command.as_str() {
                 "init" | "i" => self.init_bundle()?,
                 "add" | "a" => self.add_bundle(args.get(2))?,
                 "watch" | "w" => {
@@ -290,6 +294,7 @@ impl Interface {
                 }
                 "edit" | "e" => self.open_editor(args)?,
                 // "update" | "u" => self.update_bundles()?,
+                "workspace" | "ws" => self.load_workspace(args)?,
                 "open" | "o" => self.open_bundle(args)?,
                 "doc" | "d" => self.open_doc(args)?,
                 "pin" | "p" => self.pin_bundle()?,
@@ -299,12 +304,16 @@ impl Interface {
                 // "install" | "-in" => self.install_deps()?,
                 "+" => self.run_wildcard(args)?,
                 "-" => self.run_last_cmd()?,
-                _ => self.run_bundle_cmd(bundle.to_owned(), args)?,
+                _ => self.run_bundle_cmd(command.to_owned(), args)?,
             }
         } else {
             self.display_salt_help(&self.bundles);
         }
 
+        Ok(())
+    }
+
+    fn load_workspace(&self, _args: &[String]) -> Result<()> {
         Ok(())
     }
 
@@ -333,7 +342,7 @@ impl Interface {
     fn open_doc_from_web(&self, link: &str) -> Result<()> {
         if link.contains("github.com") {
             let mut raw_gh_link = link.replace("github.com", "raw.githubusercontent.com");
-            if !raw_gh_link.ends_with("SALT.md") && !raw_gh_link.ends_with("/") {
+            if !raw_gh_link.ends_with("SALT.md") && !raw_gh_link.ends_with('/') {
                 raw_gh_link.push_str("/main/SALT.md");
             } else if !raw_gh_link.ends_with("SALT.md") {
                 raw_gh_link.push_str("SALT.md");
@@ -349,9 +358,9 @@ impl Interface {
             let doc_html_name = raw_gh_link
                 .replace("https://", "")
                 .replace("http://", "")
-                .replace("/", "")
+                .replace('/', "")
                 .replace("raw.githubusercontent.com", "")
-                .trim_start_matches("-")
+                .trim_start_matches('-')
                 .to_owned();
             let doc_path = self.cache_path.join(format!("{}.html", doc_html_name));
             let mut reg = handlebars::Handlebars::new();
@@ -446,7 +455,7 @@ impl Interface {
             "bundle not found",
         ));
         if let Some(bundle_name) = args.get(2) {
-            if let Some(_) = self.bundle_map.get(bundle_name) {
+            if self.bundle_map.get(bundle_name).is_some() {
                 let mut c = self.full_config.clone().unwrap();
                 c.pinned_paths.remove(bundle_name);
                 dbg!(&c);
@@ -601,10 +610,10 @@ impl Interface {
                         std::env::set_current_dir(mbundle_path)?;
                     }
                     let mut cmd = std::process::Command::new(
-                        c.command.split(" ").collect::<Vec<&str>>().first().unwrap(),
+                        c.command.split(' ').collect::<Vec<&str>>().first().unwrap(),
                     );
                     cmd.envs(&self.env_vars);
-                    cmd.args(&c.command.split(" ").collect::<Vec<&str>>()[1..]);
+                    cmd.args(&c.command.split(' ').collect::<Vec<&str>>()[1..]);
                     cmd.status()?;
                     return Ok(());
                 }

@@ -4,7 +4,7 @@ use super::{Command, MDBundle, MDOptions};
 use crate::app::Watcher;
 use markdown::Block;
 
-pub static VERSION: &'static str = "0.1.0";
+pub static VERSION: &str = "0.1.0";
 
 impl From<Vec<markdown::Block>> for MDBundle {
     fn from(value: Vec<markdown::Block>) -> Self {
@@ -94,20 +94,20 @@ impl From<Vec<markdown::Block>> for MDBundle {
                 Block::Header(h, hsize) => {
                     // println!("header : {h:?}");
 
-                    if hsize == 1 as usize {
+                    if hsize == 1_usize {
                         continue;
                     }
-                    if hsize == 2 as usize && h.len() != 1 {
+                    if hsize == 2_usize && h.len() != 1 {
                         return bundle;
                     }
-                    if !doc_section.is_empty() && hsize == 4 as usize {
+                    if !doc_section.is_empty() && hsize == 4_usize {
                         bundle
                             .docs
                             .entry(doc_section.clone())
-                            .and_modify(|e| e.push(Block::Header(h.clone(), 4 as usize)));
+                            .and_modify(|e| e.push(Block::Header(h.clone(), 4_usize)));
                         continue;
                     }
-                    if hsize == 3 as usize {
+                    if hsize == 3_usize {
                         mode = 2;
                         match h.first().unwrap() {
                             markdown::Span::Text(t) => {
@@ -120,7 +120,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                         }
                         continue;
                     }
-                    if hsize == 2 as usize {
+                    if hsize == 2_usize {
                         doc_section = String::new();
                         match h.first().unwrap() {
                             // markdown::Span::Break => todo!(),
@@ -183,7 +183,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                     }
                                     // println!("joint: {cmd_info}");
                                     let splitted = cmd_info
-                                        .split("-")
+                                        .split('-')
                                         .map(|e| e.trim())
                                         .collect::<Vec<&str>>();
                                     if splitted.len() == 1 {
@@ -196,7 +196,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                     };
                                     bundle
                                         .commands
-                                        .insert(splitted.get(0).unwrap().to_owned().into(), cmd);
+                                        .insert(splitted.first().unwrap().to_owned().into(), cmd);
                                 }
                                 markdown::ListItem::Paragraph(_) => return bundle,
                             }
@@ -216,7 +216,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                         };
                                     }
                                     let splitted = cmd_info
-                                        .split("-")
+                                        .split('-')
                                         .map(|e| e.trim())
                                         .collect::<Vec<&str>>();
                                     if splitted.len() == 1 {
