@@ -76,15 +76,19 @@ fn blocks_to_html(html: &mut String, script_content: &mut String, blocks: &Vec<B
             }
             Block::CodeBlock(meta, cblock) => {
                 if meta.is_some() && meta.as_ref().unwrap().eq("dot") {
+                    // uid_cblock is the combination of dot graph value
+                    // and appended by -- and followed by uid
+                    // which is the position of this section
                     let mut uid_cblock = cblock.to_owned();
                     uid_cblock.push_str(&format!("--{}--", uid));
-                    println!(
-                        "code block: {:?} -- cblock: {} -- uid: {} -- uid_cblock: {:?}",
-                        meta, cblock, uid, uid_cblock
-                    );
+
+                    // create a unique id from the uid_cblock for injecting
+                    // graphviz graph on page load
                     let viz_element = format!("viz-{}", get_hashed_id(uid_cblock));
+
                     // create a div with viz element id
                     html.push_str(&format!("<div id='{}'></div>", viz_element));
+
                     // add function call to load dot graph into the viz element on window load
                     append_dot_script_block(&viz_element, script_content, cblock);
                 } else {
@@ -132,7 +136,6 @@ fn blocks_to_html(html: &mut String, script_content: &mut String, blocks: &Vec<B
 }
 
 fn append_dot_script_block(viz_element: &String, script_content: &mut String, cblock: &str) {
-    println!("pushing: {}", viz_element);
     let dot_block = format!(
         r#"draw_into_element(`{}`, '{}');
     

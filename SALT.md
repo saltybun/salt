@@ -9,6 +9,7 @@ users know what your project can do for them.
 - i - `cp target/debug/salt /usr/local/bin/s` - installs the salt binary
 - r - `cargo run` - runs the salt binary
 - c - `cargo clippy` - runs clippy command for salt binary
+- p - `./pack` - creates a release package
 
 ## options
 
@@ -58,7 +59,7 @@ s chips
   considered as a bundle.
 - Can be used as a tooling framework for your project/organization.
 - Cross-team tooling and collaboration
-- No directory/context switching needed
+- Reduce directory/context switching
 - Seamless updates of your bundle through `s update`
 
 ### Intrinsics
@@ -115,3 +116,89 @@ cd $(s j $bundle)
 ```
 
 where `$bundle` is the name of your bundle.
+
+### Local Docs
+
+#### Write concise documentation
+
+`SALT.md` file serves as an interface to your projects, it can tell you more
+about the project than the code written, if used it wisely.
+
+```dot
+digraph {
+    concentrate=true
+    a -> b [label="1"]
+    c -> b
+    d -> b
+}
+```
+
+```
+### This is a section
+```
+
+```
+### This is a heading inside the section
+```
+
+To give you an example from this doc itself:
+
+> you can see that here `Local Docs` is a section and
+> `Write concise documentation` is a heading inside this section.
+
+### Editing projects
+
+#### From anywhere
+
+You can use the `edit` or `e` command to open any pinned salt project from any
+location through your terminal.
+
+You can go to `~/.salt/.config` to set your favourite editor there.
+
+> **Default:** `vi` (vi editor)
+
+```
+{
+    "editor": "code", // changed it to VS Code
+    "pinned_paths": {}
+}
+```
+
+### Opening file explorer
+
+#### From anywhere
+
+You can use the `open` or `o` command to open your default OS file manager
+pointed to the salt project. Example:
+
+```
+s o PROJECT/BUNDLE
+```
+
+### Dot Diagrams
+
+#### Drawing Graphs
+
+Salt supports [Graphviz](https://graphviz.gitlab.io) diagrams which can be used to embed diagrams. The below graph:
+
+```dot
+digraph {
+    concentrate=true
+    a -> b [label="1"]
+    c -> b
+    d -> b
+}
+```
+
+can be represented using the following code:
+
+```
+digraph {
+    concentrate=true
+    a -> b [label="1"]
+    c -> b
+    d -> b
+}
+```
+
+To learn more, checkout [Graphviz documentation](https://graphviz.gitlab.io/documentation/).
