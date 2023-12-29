@@ -139,7 +139,7 @@ fn load_current_dir_bundle(state: &mut Interface) -> Result<()> {
     let cwd = std::env::current_dir().unwrap();
     let saltmd = cwd.join("SALT.md");
     if !saltmd.exists() {
-        println!("not a salt project or bundle");
+        // println!("not a salt project or bundle");
         return Ok(());
     }
     let md_str = std::fs::read_to_string(saltmd).unwrap().to_string();

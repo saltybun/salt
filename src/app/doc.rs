@@ -12,6 +12,7 @@ use super::MDBundle;
 pub struct Doc {
     version: String,
     project: String,
+    script_content: String,
     titles: Vec<(String, String, String)>,
     contents: Vec<(String, String, String)>,
     about: String,
@@ -57,12 +58,12 @@ fn spans_to_html(spans: &Vec<Span>) -> String {
     html
 }
 
-fn blocks_to_html(html: &mut String, blocks: &Vec<Block>) {
+fn blocks_to_html(html: &mut String, script_content: &mut String, blocks: &Vec<Block>, uid: usize) {
     for block in blocks {
         match block {
             Block::Blockquote(bq) => {
                 html.push_str(r#"<div class="bq">"#);
-                blocks_to_html(html, bq);
+                blocks_to_html(html, script_content, bq, uid);
                 html.push_str("</div>");
             }
             Block::Header(h, _) => {
@@ -73,8 +74,22 @@ fn blocks_to_html(html: &mut String, blocks: &Vec<Block>) {
             Block::Paragraph(spans) => {
                 html.push_str(&spans_to_html(spans));
             }
-            Block::CodeBlock(_lang, cblock) => {
-                html.push_str(&format!("<pre>{cblock}</pre>"));
+            Block::CodeBlock(meta, cblock) => {
+                if meta.is_some() && meta.as_ref().unwrap().eq("dot") {
+                    let mut uid_cblock = cblock.to_owned();
+                    uid_cblock.push_str(&format!("--{}--", uid));
+                    println!(
+                        "code block: {:?} -- cblock: {} -- uid: {} -- uid_cblock: {:?}",
+                        meta, cblock, uid, uid_cblock
+                    );
+                    let viz_element = format!("viz-{}", get_hashed_id(uid_cblock));
+                    // create a div with viz element id
+                    html.push_str(&format!("<div id='{}'></div>", viz_element));
+                    // add function call to load dot graph into the viz element on window load
+                    append_dot_script_block(&viz_element, script_content, cblock);
+                } else {
+                    html.push_str(&format!("<pre>{cblock}</pre>"));
+                }
             }
             Block::OrderedList(items, _) => {
                 html.push_str("<ol>");
@@ -86,7 +101,7 @@ fn blocks_to_html(html: &mut String, blocks: &Vec<Block>) {
                         }
                         markdown::ListItem::Paragraph(p) => {
                             let mut list_para = String::from("<li>");
-                            blocks_to_html(&mut list_para, p);
+                            blocks_to_html(&mut list_para, script_content, p, uid);
                             html.push_str(&list_para);
                             html.push_str("</li>");
                         }
@@ -103,7 +118,7 @@ fn blocks_to_html(html: &mut String, blocks: &Vec<Block>) {
                         }
                         markdown::ListItem::Paragraph(p) => {
                             let mut list_para = String::from("<li>");
-                            blocks_to_html(&mut list_para, p);
+                            blocks_to_html(&mut list_para, script_content, p, uid);
                             html.push_str(&list_para);
                             html.push_str("</li>");
                         }
@@ -116,9 +131,20 @@ fn blocks_to_html(html: &mut String, blocks: &Vec<Block>) {
     }
 }
 
-fn get_html(blocks: &Vec<Block>) -> String {
+fn append_dot_script_block(viz_element: &String, script_content: &mut String, cblock: &str) {
+    println!("pushing: {}", viz_element);
+    let dot_block = format!(
+        r#"draw_into_element(`{}`, '{}');
+    
+    "#,
+        cblock, viz_element
+    );
+    script_content.push_str(&dot_block);
+}
+
+fn get_html(blocks: &Vec<Block>, script_content: &mut String, uid: usize) -> String {
     let mut html = String::new();
-    blocks_to_html(&mut html, blocks);
+    blocks_to_html(&mut html, script_content, blocks, uid);
     html
 }
 
@@ -127,6 +153,7 @@ impl From<MDBundle> for Doc {
         let mut doc = Doc {
             version: value.version.clone(),
             project: value.options.name,
+            script_content: String::new(),
             contents: vec![],
             titles: vec![],
             about: value.about,
@@ -144,8 +171,11 @@ impl From<MDBundle> for Doc {
             doc.titles.push(data);
         }
         for (i, content) in value.docs.values().enumerate() {
+            let mut script_chunk = String::new();
+            let html = get_html(content, &mut script_chunk, i);
+            doc.script_content.push_str(&script_chunk);
             let data = (
-                get_html(content),
+                html,
                 index_idhash_map.get(&i).unwrap().to_owned(),
                 if i == 0 {
                     "show active".into()

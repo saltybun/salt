@@ -31,5 +31,5 @@ s d help
 | Platform | Build | Tested |
 | -------- | ----- | ------ |
 | Windows  | ✅    | ❌     |
-| Linux    | ✅    | ✅     |
+| Linux    | ✅    | ❌     |
 | OSX      | ✅    | ✅     |
