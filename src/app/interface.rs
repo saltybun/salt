@@ -10,7 +10,6 @@ use super::{BundleMap, SaltConfig};
 
 static HBS_FILE: &str = include_str!("../../templates/salt.hbs");
 static INIT_HBS_FILE: &str = include_str!("../../templates/init.hbs");
-static SALTMD_STR: &str = include_str!("../../SALT.md");
 
 static SALT_HBS_NAME: &str = "salt.hbs";
 static INIT_HBS_NAME: &str = "init.hbs";
@@ -375,25 +374,7 @@ impl Interface {
     }
 
     fn open_salt_doc(&self) -> Result<()> {
-        let salt_html_fname = format!("salt-help-{}.html", crate::app::parser::VERSION);
-        let tokens = markdown::tokenize(SALTMD_STR);
-        let bundle = crate::app::MDBundle::from(tokens);
-        let doc = crate::app::doc::Doc::from(bundle.to_owned());
-        let doc_path = self.cache_path.join(salt_html_fname);
-        // short circuit if doc is already there for the current version of salt
-        #[cfg(not(debug_assertions))]
-        if doc_path.exists() {
-            // TODO: handle unwrap
-            webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
-            return Ok(());
-        }
-        let mut reg = handlebars::Handlebars::new();
-        // TODO: handle unwrap
-        reg.register_template_string(SALT_HBS_NAME, HBS_FILE)
-            .unwrap();
-        let html = reg.render(SALT_HBS_NAME, &doc).unwrap();
-        std::fs::write(doc_path.clone(), html)?;
-        webbrowser::open_browser(webbrowser::Browser::Default, doc_path.to_str().unwrap())?;
+        webbrowser::open_browser(webbrowser::Browser::Default, "https://saltybun.github.io")?;
         Ok(())
     }
 
