@@ -28,8 +28,9 @@ s d help
 
 ## Platform Support
 
-| Platform | Build | Tested |
-| -------- | ----- | ------ |
-| Windows  | ✅    | ❌     |
-| Linux    | ✅    | ❌     |
-| OSX      | ✅    | ✅     |
+| Platform          | Build | Tested |
+| ----------------- | ----- | ------ |
+| Windows           | ❌    | ❌     |
+| Linux             | ❌    | ❌     |
+| OSX               | ✅    | ✅     |
+| OSX M series      | ✅    | ✅     |
