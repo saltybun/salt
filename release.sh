@@ -1,11 +1,12 @@
+VERSION=V0.1.0
 # LINUX_64="x86_64-unknown-linux-gnu"
 MAC_64="x86_64-apple-darwin"
 MAC_M="aarch64-apple-darwin"
 # WIN_64="x86_64-pc-windows-gnu"
 
 # cleanup
-rm salt-$MAC_64.zip
-rm salt-$MAC_M.zip
+rm salt-$MAC_64-$VERSION.zip
+rm salt-$MAC_M-$VERSION.zip
 
 # echo "Building for linux"
 # TARGET_CC=x86_64-unknown-linux-gnu cargo build -r --target $LINUX_64
@@ -23,6 +24,6 @@ strip target/$MAC_M/release/salt
 # cargo build -r --target $WIN_64
 
 # zip ./salt-$LINUX_64.zip target/$LINUX_64/release/salt
-zip ./salt-$MAC_64.zip target/$MAC_64/release/salt
-zip ./salt-$MAC_M.zip target/$MAC_M/release/salt
+zip ./salt-$MAC_64-$VERSION.zip target/$MAC_64/release/salt
+zip ./salt-$MAC_M-$VERSION.zip target/$MAC_M/release/salt
 # zip ./salt-$WIN_64.zip target/$WIN_64/release/salt
