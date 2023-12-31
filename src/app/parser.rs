@@ -215,6 +215,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                             _ => return bundle,
                                         };
                                     }
+
                                     let splitted = cmd_info
                                         .split('-')
                                         .map(|e| e.trim())
@@ -222,14 +223,21 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                     if splitted.len() == 1 {
                                         continue;
                                     }
+
+                                    // match the directives
                                     match splitted.first().unwrap().to_owned() {
                                         "type" => {
                                             bundle.options.typ =
                                                 splitted.get(1).unwrap().to_owned().into();
                                         }
                                         "name" => {
-                                            bundle.options.name =
-                                                splitted.get(1).unwrap().to_owned().into();
+                                            // this handles cases when the name of the project has
+                                            // hyphen(-) in it
+                                            bundle.options.name = splitted
+                                                .get(1..splitted.len())
+                                                .unwrap()
+                                                .to_owned()
+                                                .join("-");
                                         }
                                         _ => {
                                             continue;
