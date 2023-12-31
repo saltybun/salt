@@ -1,12 +1,11 @@
-VERSION=V0.1.0
+VERSION=v0.1.1
 # LINUX_64="x86_64-unknown-linux-gnu"
 MAC_64="x86_64-apple-darwin"
 MAC_M="aarch64-apple-darwin"
 # WIN_64="x86_64-pc-windows-gnu"
 
 # cleanup
-rm salt-$MAC_64-$VERSION.zip
-rm salt-$MAC_M-$VERSION.zip
+rm salt-*.zip
 
 # echo "Building for linux"
 # TARGET_CC=x86_64-unknown-linux-gnu cargo build -r --target $LINUX_64

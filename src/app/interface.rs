@@ -738,12 +738,14 @@ impl Interface {
 
     fn display_salt_help(&self, bundles: &Vec<MDBundle>) {
         // clear_screen();
-        let mut help: String = r#" [🧂] gives you superpowers
-version: 0.1.0
+        let mut help = format!(
+            r#" [🧂] gives you superpowers
+version: {}
     
 Salt commands:
-"#
-        .into();
+"#,
+            crate::app::parser::VERSION
+        );
         for ibundle in INTRINSICS {
             help.push_str(
                 format!(

@@ -8,7 +8,7 @@ scripts from any folder or a git repository.
 
 > _Boost your productivity with a 🤏🏻 of 🧂_
 
-![version](https://img.shields.io/badge/version-v0.1.0-orange)
+![version](https://img.shields.io/badge/version-v0.1.1-orange)
 ![category](https://img.shields.io/badge/beta-teal)
 
 ## Install 🧂
