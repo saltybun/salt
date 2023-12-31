@@ -102,6 +102,13 @@ fn load_config(state: &mut Interface) -> Result<()> {
 
 fn write_config(c: &SaltConfig) -> Result<()> {
     if let Some(home) = home::home_dir() {
+        // if cache directory is not there create one
+        let cache_dir = home.join(".salt");
+        if !cache_dir.exists() {
+            std::fs::create_dir(cache_dir)?;
+        }
+
+        // write json config
         let cfg_path = home.join(".salt").join(".config");
         let mut cfg_file = std::fs::File::create(cfg_path)?;
         let c = serde_json::to_string_pretty(&c).unwrap();
