@@ -1,4 +1,4 @@
-VERSION=v0.1.1
+VERSION=v0.1.2
 # LINUX_64="x86_64-unknown-linux-gnu"
 MAC_64="x86_64-apple-darwin"
 MAC_M="aarch64-apple-darwin"

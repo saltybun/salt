@@ -6,6 +6,8 @@ pub(crate) mod doc;
 pub(crate) mod interface;
 pub(crate) mod parser;
 
+pub static VERSION: &str = env!("CARGO_PKG_VERSION");
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct Command {
     pub about: String,

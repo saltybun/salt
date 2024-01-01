@@ -41,7 +41,7 @@ pub struct Interface {
     bundles: Vec<MDBundle>,
     /// this is to check if there is bundle conflict
     bundle_map: BundleMap,
-    /// TDOO: dont keep config as optional
+    // TODO: dont keep config as optional
     config: Option<SaltConfig>,
     /// full_config is untouched config which is directly read from config file
     /// it does not get mutated across whole flow
@@ -744,7 +744,7 @@ version: {}
     
 Salt commands:
 "#,
-            crate::app::parser::VERSION
+            crate::app::VERSION
         );
         for ibundle in INTRINSICS {
             help.push_str(

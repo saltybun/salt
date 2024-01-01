@@ -124,21 +124,12 @@ where `$bundle` is the name of your bundle.
 `SALT.md` file serves as an interface to your projects, it can tell you more
 about the project than the code written, if used it wisely.
 
-```dot
-digraph {
-    concentrate=true
-    a -> b [label="1"]
-    c -> b
-    d -> b
-}
-```
-
 ```
 ### This is a section
 ```
 
 ```
-### This is a heading inside the section
+#### This is a heading inside the section
 ```
 
 To give you an example from this doc itself:
@@ -174,6 +165,22 @@ pointed to the salt project. Example:
 ```
 s o PROJECT/BUNDLE
 ```
+
+### Contributing
+
+#### Interface Flow
+
+There is a internal flow which is executed whenever you invoke the `salt` command.
+
+We use the `markdown` crate to tokenize the `SALT.md` file. Once the tokenization is done, we get a list of `Block` which are collection of markdown blocks. 
+
+The salt parser is capable of converting the `Vev<markdown::Block>` into what's called a `salt::MDBundle`. The `salt::MDBundle` is internal representation of Salt Bundle in Markdown form. Hence the name, `salt::MDBundle`.
+
+#### Doc Flow
+
+If you want commands to be run through the CLI `salt::MDBundle` is the final representation. But if you want to view your bundle as a document, the `salt::MDBundle` is converted into `salt::Doc`. This is where `markdown::Blocks` are converted to proper HTML representation of themselves.
+
+The custom parsing helps us to create `salt::Doc` which is then passed to `salt.hbs` which is the salt doc template, and final HTML is rendered by handlebars templating engine.
 
 ### Dot Diagrams
 

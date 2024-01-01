@@ -4,12 +4,10 @@ use super::{Command, MDBundle, MDOptions};
 use crate::app::Watcher;
 use markdown::Block;
 
-pub static VERSION: &str = "0.1.1";
-
 impl From<Vec<markdown::Block>> for MDBundle {
     fn from(value: Vec<markdown::Block>) -> Self {
         let mut bundle = MDBundle {
-            version: VERSION.to_owned(),
+            version: crate::app::VERSION.to_owned(),
             processed: false,
             docs: indexmap::IndexMap::new(),
             options: MDOptions {
