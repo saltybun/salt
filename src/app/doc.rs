@@ -59,7 +59,7 @@ fn spans_to_html(spans: &Vec<Span>) -> String {
 }
 
 fn blocks_to_html(html: &mut String, script_content: &mut String, blocks: &Vec<Block>, uid: usize) {
-    for block in blocks {
+    for (i, block) in blocks.iter().enumerate() {
         match block {
             Block::Blockquote(bq) => {
                 html.push_str(r#"<div class="bq">"#);
@@ -73,6 +73,12 @@ fn blocks_to_html(html: &mut String, script_content: &mut String, blocks: &Vec<B
             }
             Block::Paragraph(spans) => {
                 html.push_str(&spans_to_html(spans));
+                // peeking if next block is also a paragraph
+                if blocks.get(i + 1).is_some()
+                    && matches!(blocks.get(i + 1).unwrap(), Block::Paragraph(_))
+                {
+                    html.push_str("<br /><br />")
+                }
             }
             Block::CodeBlock(meta, cblock) => {
                 if meta.is_some() && meta.as_ref().unwrap().eq("dot") {

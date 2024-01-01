@@ -233,11 +233,8 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                         "name" => {
                                             // this handles cases when the name of the project has
                                             // hyphen(-) in it
-                                            bundle.options.name = splitted
-                                                .get(1..splitted.len())
-                                                .unwrap()
-                                                .to_owned()
-                                                .join("-");
+                                            bundle.options.name =
+                                                splitted.get(1..).unwrap().to_owned().join("-");
                                         }
                                         _ => {
                                             continue;
