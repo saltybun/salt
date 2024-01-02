@@ -3,6 +3,7 @@ use std::io::{Result, Write};
 use std::path::PathBuf;
 use std::process::Stdio;
 
+use crate::app::log;
 use crate::watcher::async_watch;
 
 use super::MDBundle;
@@ -70,6 +71,8 @@ fn load_envs(state: &mut Interface) -> Result<()> {
         "SALT_CWD".into(),
         std::env::current_dir().unwrap().to_string_lossy().into(),
     );
+
+    log!("loaded envs");
     Ok(())
 }
 
@@ -82,6 +85,7 @@ fn load_config(state: &mut Interface) -> Result<()> {
                 if let Ok(config_str) = std::fs::read_to_string(salt_config_path) {
                     let c = serde_json::from_str::<SaltConfig>(&config_str)
                         .expect("error while reading salt config");
+                    log!("{:?}", &c);
                     state.config = Some(c.clone());
                     state.full_config = Some(c);
                 }
@@ -105,11 +109,13 @@ fn write_config(c: &SaltConfig) -> Result<()> {
         // if cache directory is not there create one
         let cache_dir = home.join(".salt");
         if !cache_dir.exists() {
-            std::fs::create_dir(cache_dir)?;
+            log!("cache dir not found | creating one");
+            std::fs::create_dir(&cache_dir)?;
         }
 
         // write json config
-        let cfg_path = home.join(".salt").join(".config");
+        log!("writing initial config");
+        let cfg_path = cache_dir.join(".config");
         let mut cfg_file = std::fs::File::create(cfg_path)?;
         let c = serde_json::to_string_pretty(&c).unwrap();
         cfg_file.write_all(c.as_bytes())?;
@@ -145,12 +151,12 @@ fn load_current_dir_bundle(state: &mut Interface) -> Result<()> {
     let cwd = std::env::current_dir().unwrap();
     let saltmd = cwd.join("SALT.md");
     if !saltmd.exists() {
-        // println!("not a salt project or bundle");
+        log!("not a salt project or bundle");
         return Ok(());
     }
     let md_str = std::fs::read_to_string(saltmd).unwrap().to_string();
     let tokens = markdown::tokenize(&md_str);
-    // println!("tokens: {tokens:?}");
+    log!("markdown tokens: {tokens:?}");
 
     let mut marked_key = String::new();
     for (k, v) in state.config.as_mut().unwrap().pinned_paths.iter() {
@@ -159,8 +165,7 @@ fn load_current_dir_bundle(state: &mut Interface) -> Result<()> {
         }
     }
     if !marked_key.is_empty() {
-        // TODO: find a way to do debug logging
-        // println!("current directory is also marked, loading only once");
+        log!("current directory is also marked, loading only once");
         state
             .config
             .as_mut()
@@ -169,7 +174,7 @@ fn load_current_dir_bundle(state: &mut Interface) -> Result<()> {
             .remove_entry(&marked_key);
     }
     let mut curr_bundle = crate::app::MDBundle::from(tokens);
-    // println!("curr bundle: {curr_bundle:?}");
+    log!("this bundle: {curr_bundle:?}");
     if curr_bundle.options.name.is_empty() {
         println!(
             "current salt {package} doesn't have a name!",
@@ -207,7 +212,9 @@ fn load_current_dir_bundle(state: &mut Interface) -> Result<()> {
 fn load_pinned_bundles(state: &mut Interface) -> Result<()> {
     for (_, mpath_str) in state.config.as_ref().unwrap().pinned_paths.iter() {
         let mpath = std::path::PathBuf::from(mpath_str);
+        log!("pinned path: {mpath:?}");
         if !mpath.join("SALT.md").exists() {
+            log!("pinned path: {mpath:?} does not contain SALT.md");
             continue;
         }
 

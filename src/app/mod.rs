@@ -48,3 +48,13 @@ pub struct SaltConfig {
 }
 
 pub type BundleMap = HashMap<String, MDBundle>;
+
+#[cfg(debug_assertions)]
+macro_rules! log {
+    ($( $args:expr ),*) => {
+        print!("[DEBUG]  ");
+        println!( $( $args ),* );
+    }
+}
+
+pub(crate) use log;
