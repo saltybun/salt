@@ -1,5 +1,4 @@
 mod app;
-mod watcher;
 
 use app::interface::Interface;
 

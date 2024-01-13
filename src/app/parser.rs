@@ -1,7 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
 use super::{Command, MDBundle, MDOptions};
-use crate::app::Watcher;
 use markdown::Block;
 
 impl From<Vec<markdown::Block>> for MDBundle {
@@ -14,7 +13,6 @@ impl From<Vec<markdown::Block>> for MDBundle {
                 typ: "bundle".into(),
                 name: String::new(),
             },
-            watcher: Watcher { debounce_secs: 2 },
             commands: HashMap::new(),
             about: String::new(),
             help: String::from("this is a salt package"),

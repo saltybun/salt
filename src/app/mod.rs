@@ -34,11 +34,6 @@ pub struct MDBundle {
     pub is_pinned: bool,
     pub bundle_path: PathBuf,
     pub exec_path: PathBuf,
-    pub watcher: Watcher,
-}
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub struct Watcher {
-    pub debounce_secs: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

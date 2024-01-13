@@ -4,7 +4,6 @@ use std::path::PathBuf;
 use std::process::Stdio;
 
 use crate::app::log;
-use crate::watcher::async_watch;
 
 use super::MDBundle;
 use super::{BundleMap, SaltConfig};
@@ -16,7 +15,7 @@ static SALT_HBS_NAME: &str = "salt.hbs";
 static INIT_HBS_NAME: &str = "init.hbs";
 
 /// INTRINSICS are commands which are internal to salt bundler
-const INTRINSICS: [(&str, &str, &str); 12] = [
+const INTRINSICS: [(&str, &str, &str); 11] = [
     ("init", "i", "Initialize new salt bundle in this directory"),
     ("add", "a", "Adds a salt bundle to your machine"),
     ("doc", "d", "Opens SALT package doc as a HTML page"),
@@ -27,7 +26,6 @@ const INTRINSICS: [(&str, &str, &str); 12] = [
     ("pin", "p", "pin a folder as a salt bundle"),
     ("open", "o", "open a salt bundle in default file explorer"),
     ("unpin", "unp", "unpin a pinned salt bundle"),
-    ("watch", "w", "Runs a watcher for the bundle command"),
     (
         "jump",
         "j",
@@ -300,11 +298,6 @@ impl Interface {
             match command.as_str() {
                 "init" | "i" => self.init_bundle()?,
                 "add" | "a" => self.add_bundle(args.get(2))?,
-                "watch" | "w" => {
-                    let mut a = args.to_owned();
-                    a.rotate_left(1);
-                    self.start_watcher(&a)?
-                }
                 "edit" | "e" => self.open_editor(args)?,
                 // "update" | "u" => self.update_bundles()?,
                 "workspace" | "ws" => self.load_workspace(args)?,
@@ -569,12 +562,16 @@ impl Interface {
         let cwd = std::env::current_dir()?;
         let folder_name = cwd.file_name().unwrap().to_str().unwrap();
         let bundle_file_path = cwd.join("SALT.md");
+		
+		// check if this folder is already a salt bundle
         if bundle_file_path.exists() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::AlreadyExists,
                 "already a salt bundle!",
             ));
         }
+		
+		// initialize init.hbs template
         let mut reg = handlebars::Handlebars::new();
         // TODO: handle unwrap
         reg.register_template_string(INIT_HBS_NAME, INIT_HBS_FILE)
@@ -702,45 +699,6 @@ impl Interface {
             }
         }
         Ok(())
-    }
-
-    fn start_watcher(&self, args: &Vec<String>) -> Result<()> {
-        let args_len = args.len();
-        let err = Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "usage: watch {BUNDLE} {COMMAND}",
-        ));
-        if args_len < 3 {
-            return err;
-        }
-        if let Some(bundle) = args.get(1) {
-            self.run_watch_bundle_cmd(bundle, args)?;
-        }
-
-        err
-    }
-
-    fn run_watch_bundle_cmd(&self, bundle_name: &String, args: &[String]) -> Result<()> {
-        if let Some(bundle) = self.bundle_map.get(bundle_name) {
-            if let Some(command) = bundle.commands.get(args.get(2).unwrap()) {
-                futures::executor::block_on(async {
-                    if let Err(e) = async_watch(
-                        self,
-                        command,
-                        bundle.exec_path.clone(),
-                        bundle.watcher.debounce_secs,
-                    )
-                    .await
-                    {
-                        println!("error: {:?}", e)
-                    }
-                });
-            }
-        }
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "command invalid or not found",
-        ))
     }
 
     fn display_salt_help(&self, bundles: &Vec<MDBundle>) {
