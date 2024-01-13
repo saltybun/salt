@@ -562,16 +562,16 @@ impl Interface {
         let cwd = std::env::current_dir()?;
         let folder_name = cwd.file_name().unwrap().to_str().unwrap();
         let bundle_file_path = cwd.join("SALT.md");
-		
-		// check if this folder is already a salt bundle
+
+        // check if this folder is already a salt bundle
         if bundle_file_path.exists() {
             return Err(std::io::Error::new(
                 std::io::ErrorKind::AlreadyExists,
                 "already a salt bundle!",
             ));
         }
-		
-		// initialize init.hbs template
+
+        // initialize init.hbs template
         let mut reg = handlebars::Handlebars::new();
         // TODO: handle unwrap
         reg.register_template_string(INIT_HBS_NAME, INIT_HBS_FILE)
@@ -601,11 +601,16 @@ impl Interface {
                             .unwrap();
                         std::env::set_current_dir(mbundle_path)?;
                     }
-                    let mut cmd = std::process::Command::new(
-                        c.command.split(' ').collect::<Vec<&str>>().first().unwrap(),
-                    );
+
+                    log!("running command: {}", c.command);
+
+                    let splitted_cmd = c.command.split(' ').collect::<Vec<&str>>();
+                    let mut cmd = std::process::Command::new(splitted_cmd.first().unwrap());
+
+                    log!("running with args: {:?}", args);
+
                     cmd.envs(&self.env_vars);
-                    cmd.args(&c.command.split(' ').collect::<Vec<&str>>()[1..]);
+                    cmd.args(&splitted_cmd[1..]);
                     cmd.status()?;
                     return Ok(());
                 }

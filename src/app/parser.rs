@@ -1,6 +1,6 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use super::{Command, MDBundle, MDOptions};
+use super::{log, Command, MDBundle, MDOptions};
 use markdown::Block;
 
 impl From<Vec<markdown::Block>> for MDBundle {
@@ -168,17 +168,20 @@ impl From<Vec<markdown::Block>> for MDBundle {
                         for item in items {
                             match item {
                                 markdown::ListItem::Simple(span_vec) => {
-                                    // println!("command: {span_vec:?}");
+                                    log!("command: {span_vec:?}");
+                                    let mut text_info = String::new();
                                     let mut cmd_info = String::new();
                                     for span in span_vec {
                                         match span {
-                                            markdown::Span::Text(t) => cmd_info.push_str(&t),
+                                            markdown::Span::Text(t) => text_info.push_str(&t),
                                             markdown::Span::Code(c) => cmd_info.push_str(&c),
                                             _ => return bundle,
                                         };
                                     }
+                                    log!("text info: {}", text_info);
+                                    log!("command info: {}", cmd_info);
                                     // println!("joint: {cmd_info}");
-                                    let splitted = cmd_info
+                                    let splitted = text_info
                                         .split('-')
                                         .map(|e| e.trim())
                                         .collect::<Vec<&str>>();
@@ -187,8 +190,12 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                     }
                                     let cmd = Command {
                                         args: vec![],
-                                        about: splitted.get(2).unwrap().to_owned().into(),
-                                        command: splitted.get(1).unwrap().to_owned().into(),
+                                        about: splitted
+                                            .get(2)
+                                            .unwrap_or(&cmd_info.as_str())
+                                            .to_owned()
+                                            .into(),
+                                        command: cmd_info,
                                     };
                                     bundle
                                         .commands
