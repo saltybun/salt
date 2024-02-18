@@ -6,13 +6,14 @@ use std::{
 use markdown::{Block, Span};
 use serde::{Deserialize, Serialize};
 
-use super::MDBundle;
+use super::ProjectDefinition;
 
 #[derive(Serialize, Deserialize)]
 pub struct Doc {
     version: String,
     project: String,
     script_content: String,
+    // TODO: consider converting this to struct for clearer understanding
     titles: Vec<(String, String, String)>,
     contents: Vec<(String, String, String)>,
     about: String,
@@ -144,7 +145,7 @@ fn blocks_to_html(html: &mut String, script_content: &mut String, blocks: &Vec<B
 fn append_dot_script_block(viz_element: &String, script_content: &mut String, cblock: &str) {
     let dot_block = format!(
         r#"draw_into_element(`{}`, '{}');
-    
+
     "#,
         cblock, viz_element
     );
@@ -157,8 +158,8 @@ fn get_html(blocks: &Vec<Block>, script_content: &mut String, uid: usize) -> Str
     html
 }
 
-impl From<MDBundle> for Doc {
-    fn from(value: MDBundle) -> Self {
+impl From<ProjectDefinition> for Doc {
+    fn from(value: ProjectDefinition) -> Self {
         let mut doc = Doc {
             version: value.version.clone(),
             project: value.options.name,
@@ -168,6 +169,9 @@ impl From<MDBundle> for Doc {
             about: value.about,
             commands: vec![],
         };
+
+        // here we create map of all sections/titles
+        // (which is shown in the left side) of the documentation
         let mut index_idhash_map: HashMap<usize, String> = HashMap::new();
         for (i, title) in value.docs.keys().enumerate() {
             let idhash = get_hashed_id(title.clone()).to_string();
@@ -179,10 +183,17 @@ impl From<MDBundle> for Doc {
             );
             doc.titles.push(data);
         }
+
+        // here we push contents of each section
         for (i, content) in value.docs.values().enumerate() {
             let mut script_chunk = String::new();
             let html = get_html(content, &mut script_chunk, i);
             doc.script_content.push_str(&script_chunk);
+
+            // with corresponding:
+            // - html string
+            // - title of each section
+            // - and if we want to show that section active (default active: 0)
             let data = (
                 html,
                 index_idhash_map.get(&i).unwrap().to_owned(),
@@ -194,6 +205,7 @@ impl From<MDBundle> for Doc {
             );
             doc.contents.push(data);
         }
+
         for (k, v) in value.commands {
             let data = (k.clone(), v.about.clone());
             doc.commands.push(data);

@@ -38,25 +38,12 @@ repeating tasks.
 sh https://github.com/codekidx/salt/salt.sh
 ```
 
-> Add your first bundle
-
-```sh
-s add https://github.com/saltybun/salt-chips.git
-```
-
-> Run the new chips command
-
-```sh
-s chips
-```
-
 ### Use Cases
 
 #### Use cases of salt bundler
 
 - Quickly create a CLI with 2 commands `s init` and `s pin`
-- Importing scripts from anywhere. If your git repository has `salt.json` it is
-  considered as a bundle.
+- Importing scripts from anywhere. If your git repository has `salt.md` it is
 - Can be used as a tooling framework for your project/organization.
 - Cross-team tooling and collaboration
 - Reduce directory/context switching
@@ -69,19 +56,16 @@ s chips
 - `init` - inits a new `salt.json` file in the current directory with example
   command
 - `add` - adds a bundle to your salt interface
-- `pin` - pinning the folder as a salt bundle
-- `unpin` - unpin a salt bundle
-- `open` - open a bundle in your default file manager
-- `jump` - jump to the bundle folder
-- `watch {BUNDLE} {COMMAND}` - runs the command from your bundle and restarts
-  the process if directory contents changes
-- `+ {BUNDLE} {COMMAND...}` - wildcard command to run any command on a pinned
-  bundle
+- `pin` - pinning the folder as a salt project
+- `unpin` - unpin a salt project
+- `open` - open a project in your default file manager
+- `jump` - jump to the project folder
+- `+ {BUNDLE} {COMMAND...}` - wildcard command to run any command on a pinned project
 - `-` - runs the last salt command
 
 ### Creating a new bundle
 
-A new bundle can be initialized with the following command.
+A new salt project can be initialized with the following command.
 
 ```sh
 s init
@@ -91,8 +75,7 @@ s init
 
 #### Pinning
 
-You can create `SALT.md` in any folder and use it as a bundle using the `pin`
-command
+You can create `SALT.md` in any folder and use it as a salt project using the `pin` command
 
 ```sh
 s pin
@@ -100,22 +83,22 @@ s pin
 
 #### Unpinning
 
-Pinned bundle can be unpinned with the following command
+Pinned project can be unpinned with the following command
 
 ```sh
 s unpin
 ```
 
-### Jumping to a bundle
+### Jumping to a project folder
 
-To switch between bundles efficiently salt has the `jump | j` command which can
+To switch between project efficiently salt has the `jump | j` command which can
 be used with `cd` command to jump to the bundle directory.
 
 ```sh
-cd $(s j $bundle)
+cd $(s j {project})
 ```
 
-where `$bundle` is the name of your bundle.
+where `{project}` is the name of your project which is given inside `#options.name` option inside `SALT.md`.
 
 ### Local Docs
 
@@ -166,19 +149,23 @@ pointed to the salt project. Example:
 s o PROJECT/BUNDLE
 ```
 
+### Bundles
+
+A Bundle is a collection of salt projects.
+
 ### Contributing
 
 #### Interface Flow
 
 There is a internal flow which is executed whenever you invoke the `salt` command.
 
-We use the `markdown` crate to tokenize the `SALT.md` file. Once the tokenization is done, we get a list of `Block` which are collection of markdown blocks. 
+We use the `markdown` crate to tokenize the `SALT.md` file. Once the tokenization is done, we get a list of `Block` which are collection of markdown blocks.
 
-The salt parser is capable of converting the `Vev<markdown::Block>` into what's called a `salt::MDBundle`. The `salt::MDBundle` is internal representation of Salt Bundle in Markdown form. Hence the name, `salt::MDBundle`.
+The salt parser is capable of converting the `Vec<markdown::Block>` into what's called a `salt::ProjectDefinition`. The `salt::ProjectDefinition` is internal representation of Salt Project in Markdown form. Hence the name, `salt::ProjectDefinition`.
 
 #### Doc Flow
 
-If you want commands to be run through the CLI `salt::MDBundle` is the final representation. But if you want to view your bundle as a document, the `salt::MDBundle` is converted into `salt::Doc`. This is where `markdown::Blocks` are converted to proper HTML representation of themselves.
+If you want commands to be run through the CLI `salt::ProjectDefinition` is the final representation. But if you want to view your project as a document, the `salt::ProjectDefinition` is converted into `salt::Doc`. This is where `markdown::Blocks` are converted to proper HTML representation of themselves.
 
 The custom parsing helps us to create `salt::Doc` which is then passed to `salt.hbs` which is the salt doc template, and final HTML is rendered by handlebars templating engine.
 

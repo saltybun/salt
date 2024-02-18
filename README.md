@@ -3,8 +3,7 @@
 salt is command line bundler and a command manager that lets you define bundles
 of scripts and bring all your scripts under a single command called `salt | s`.
 The focus of this tool is to seamlessly share scripts between teams and improve
-productivity with ease of use. [Bundles](#salt-bundle) let your quickly import
-scripts from any folder or a git repository.
+productivity with ease of use.
 
 > _Boost your productivity with a 🤏🏻 of 🧂_
 
@@ -28,9 +27,9 @@ s d help
 
 ## Platform Support
 
-| Platform          | Build | Tested |
-| ----------------- | ----- | ------ |
-| Windows           | ❌    | ❌     |
-| Linux             | ❌    | ❌     |
-| OSX               | ✅    | ✅     |
-| OSX M series      | ✅    | ✅     |
+| Platform     | Build | Tested |
+| ------------ | ----- | ------ |
+| Windows      | ❌    | ❌     |
+| Linux        | ❌    | ❌     |
+| OSX          | ✅    | ✅     |
+| OSX M series | ✅    | ✅     |

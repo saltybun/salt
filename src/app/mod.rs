@@ -16,23 +16,23 @@ pub struct Command {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct MDOptions {
+pub(crate) struct ProjectOpts {
     pub(crate) typ: String,
     pub(crate) name: String,
 }
 
 #[derive(Debug, Clone)]
-pub struct MDBundle {
+pub struct ProjectDefinition {
     pub(crate) version: String,
     pub(crate) processed: bool,
     pub(crate) docs: indexmap::IndexMap<String, Vec<markdown::Block>>,
-    pub(crate) options: MDOptions,
+    pub(crate) options: ProjectOpts,
     pub(crate) commands: HashMap<String, Command>,
     pub(crate) about: String,
     pub(crate) help: String,
 
     pub is_pinned: bool,
-    pub bundle_path: PathBuf,
+    pub project_path: PathBuf,
     pub exec_path: PathBuf,
 }
 
@@ -42,7 +42,7 @@ pub struct SaltConfig {
     pub pinned_paths: HashMap<String, String>,
 }
 
-pub type BundleMap = HashMap<String, MDBundle>;
+pub type ProjectMap = HashMap<String, ProjectDefinition>;
 
 #[cfg(debug_assertions)]
 macro_rules! log {

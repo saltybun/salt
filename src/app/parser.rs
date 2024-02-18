@@ -1,23 +1,23 @@
 use std::{collections::HashMap, path::PathBuf};
 
-use super::{log, Command, MDBundle, MDOptions};
+use super::{log, Command, ProjectDefinition, ProjectOpts};
 use markdown::Block;
 
-impl From<Vec<markdown::Block>> for MDBundle {
+impl From<Vec<markdown::Block>> for ProjectDefinition {
     fn from(value: Vec<markdown::Block>) -> Self {
-        let mut bundle = MDBundle {
+        let mut def = ProjectDefinition {
             version: crate::app::VERSION.to_owned(),
             processed: false,
             docs: indexmap::IndexMap::new(),
-            options: MDOptions {
-                typ: "bundle".into(),
+            options: ProjectOpts {
+                typ: "project".into(),
                 name: String::new(),
             },
             commands: HashMap::new(),
             about: String::new(),
             help: String::from("this is a salt package"),
             is_pinned: false,
-            bundle_path: PathBuf::new(),
+            project_path: PathBuf::new(),
             exec_path: PathBuf::new(),
         };
 
@@ -33,8 +33,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
             match block {
                 Block::OrderedList(li, li_type) => {
                     if !doc_section.is_empty() && mode == 2 {
-                        bundle
-                            .docs
+                        def.docs
                             .entry(doc_section.clone())
                             .and_modify(|e| e.push(Block::OrderedList(li, li_type)));
                         continue;
@@ -42,8 +41,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                 }
                 Block::CodeBlock(copt, code) => {
                     if !doc_section.is_empty() && mode == 2 {
-                        bundle
-                            .docs
+                        def.docs
                             .entry(doc_section.clone())
                             .and_modify(|e| e.push(Block::CodeBlock(copt, code)));
                         continue;
@@ -51,8 +49,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                 }
                 Block::Paragraph(pspans) => {
                     if !doc_section.is_empty() && mode == 2 {
-                        bundle
-                            .docs
+                        def.docs
                             .entry(doc_section.clone())
                             .and_modify(|e| e.push(Block::Paragraph(pspans.clone())));
                         continue;
@@ -66,7 +63,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                 _ => continue,
                             }
                         }
-                        bundle.about = cmd_info;
+                        def.about = cmd_info;
                     }
                     if mode == 4 {
                         let mut cmd_info = String::new();
@@ -82,7 +79,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                             }
                         }
                         if !cmd_info.is_empty() {
-                            bundle.help = cmd_info;
+                            def.help = cmd_info;
                         }
                     }
                     continue;
@@ -94,11 +91,10 @@ impl From<Vec<markdown::Block>> for MDBundle {
                         continue;
                     }
                     if hsize == 2_usize && h.len() != 1 {
-                        return bundle;
+                        return def;
                     }
                     if !doc_section.is_empty() && hsize == 4_usize {
-                        bundle
-                            .docs
+                        def.docs
                             .entry(doc_section.clone())
                             .and_modify(|e| e.push(Block::Header(h.clone(), 4_usize)));
                         continue;
@@ -108,10 +104,10 @@ impl From<Vec<markdown::Block>> for MDBundle {
                         match h.first().unwrap() {
                             markdown::Span::Text(t) => {
                                 doc_section = t.to_owned();
-                                bundle.docs.entry(t.to_owned()).or_insert(Vec::new());
+                                def.docs.entry(t.to_owned()).or_insert(Vec::new());
                             }
                             _ => {
-                                return bundle;
+                                return def;
                             }
                         }
                         continue;
@@ -138,19 +134,18 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                     continue;
                                 }
                                 _ => {
-                                    return bundle;
+                                    return def;
                                 }
                             },
                             _ => {
-                                return bundle;
+                                return def;
                             }
                         }
                     }
                 }
                 Block::Blockquote(bq) => {
                     if !doc_section.is_empty() && mode == 2 {
-                        bundle
-                            .docs
+                        def.docs
                             .entry(doc_section.clone())
                             .and_modify(|e| e.push(Block::Blockquote(bq)));
                         continue;
@@ -158,8 +153,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                 }
                 Block::UnorderedList(items) => {
                     if !doc_section.is_empty() && mode == 2 {
-                        bundle
-                            .docs
+                        def.docs
                             .entry(doc_section.clone())
                             .and_modify(|e| e.push(Block::UnorderedList(items)));
                         continue;
@@ -175,11 +169,11 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                         match span {
                                             markdown::Span::Text(t) => text_info.push_str(&t),
                                             markdown::Span::Code(c) => cmd_info.push_str(&c),
-                                            _ => return bundle,
+                                            _ => return def,
                                         };
                                     }
-                                    log!("text info: {}", text_info);
-                                    log!("command info: {}", cmd_info);
+                                    log!("text info: {}", &text_info);
+                                    log!("text info: {}", &cmd_info);
                                     // println!("joint: {cmd_info}");
                                     let splitted = text_info
                                         .split('-')
@@ -197,11 +191,10 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                             .into(),
                                         command: cmd_info,
                                     };
-                                    bundle
-                                        .commands
+                                    def.commands
                                         .insert(splitted.first().unwrap().to_owned().into(), cmd);
                                 }
-                                markdown::ListItem::Paragraph(_) => return bundle,
+                                markdown::ListItem::Paragraph(_) => return def,
                             }
                         }
                         continue;
@@ -215,7 +208,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                         match span {
                                             markdown::Span::Text(t) => cmd_info.push_str(&t),
                                             markdown::Span::Code(c) => cmd_info.push_str(&c),
-                                            _ => return bundle,
+                                            _ => return def,
                                         };
                                     }
 
@@ -230,13 +223,13 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                     // match the directives
                                     match splitted.first().unwrap().to_owned() {
                                         "type" => {
-                                            bundle.options.typ =
+                                            def.options.typ =
                                                 splitted.get(1).unwrap().to_owned().into();
                                         }
                                         "name" => {
                                             // this handles cases when the name of the project has
                                             // hyphen(-) in it
-                                            bundle.options.name =
+                                            def.options.name =
                                                 splitted.get(1..).unwrap().to_owned().join("-");
                                         }
                                         _ => {
@@ -244,7 +237,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
                                         }
                                     }
                                 }
-                                markdown::ListItem::Paragraph(_) => return bundle,
+                                markdown::ListItem::Paragraph(_) => return def,
                             }
                         }
                     }
@@ -253,7 +246,7 @@ impl From<Vec<markdown::Block>> for MDBundle {
             }
         }
 
-        bundle.processed = true;
-        bundle
+        def.processed = true;
+        def
     }
 }
