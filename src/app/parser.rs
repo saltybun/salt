@@ -1,3 +1,4 @@
+use std::process::Command as ProcessCommand;
 use std::{collections::HashMap, path::PathBuf};
 
 use super::{log, Command, ProjectDefinition, ProjectOpts};
@@ -248,5 +249,111 @@ impl From<Vec<markdown::Block>> for ProjectDefinition {
 
         def.processed = true;
         def
+    }
+}
+
+pub(crate) fn parse_project_command(cmd: &str) -> Result<ProcessCommand, std::io::Error> {
+    if cmd.starts_with("[") {
+        let envs;
+        let start_from_index;
+        (envs, start_from_index) = parse_envs(cmd);
+        if start_from_index >= cmd.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "environment block not terminated. missing ']' ?",
+            ));
+        }
+        let mut command = parse_command(cmd, start_from_index)?;
+        command.envs(&envs);
+        return Ok(command);
+    }
+
+    parse_command(cmd, 0)
+}
+
+fn parse_command(cmd: &str, start_from_index: usize) -> Result<ProcessCommand, std::io::Error> {
+    let our_cmd = &cmd[start_from_index..];
+    let our_cmd = our_cmd.trim();
+    let splitted_cmd = our_cmd.split(' ').collect::<Vec<&str>>();
+    let mut pcmd = std::process::Command::new(splitted_cmd.first().unwrap());
+    pcmd.args(&splitted_cmd[1..]);
+    Ok(pcmd)
+}
+
+fn parse_envs(cmd: &str) -> (HashMap<String, String>, usize) {
+    let mut envs = HashMap::new();
+    let mut index = 0;
+    while index < cmd.len() {
+        let mut c = cmd.chars().nth(index).unwrap();
+        if c == '[' || c == ']' {
+            index += 1;
+            continue;
+        }
+
+        let mut vars = String::new();
+        while c != ']' && index < cmd.len() {
+            vars.push_str(&c.to_string());
+            index += 1;
+            c = cmd.chars().nth(index).unwrap();
+        }
+
+        for kv in vars.split(" ") {
+            if !kv.contains("=") {
+                continue;
+            }
+            let env_kv: Vec<&str> = kv.split("=").into_iter().collect();
+            let key = env_kv[0].to_owned();
+            let value = env_kv[1].to_owned();
+            envs.insert(key, value);
+        }
+
+        return (envs, index + 1);
+    }
+
+    (envs, index)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ffi::OsStr;
+
+    use crate::app::parser::parse_project_command;
+
+    use super::{parse_command, parse_envs};
+
+    #[test]
+    fn test_basic_parse_command() {
+        let c = "go run main.go";
+        let cmd_res = parse_command(c, 0);
+
+        assert_eq!(cmd_res.is_ok(), true);
+        assert_eq!(cmd_res.unwrap().get_program(), "go");
+    }
+
+    #[test]
+    fn test_basic_parse_envs() {
+        let c = "[a=1 b=2]";
+        let tuple = parse_envs(c);
+        assert_eq!(tuple.0.get("a"), Some(&"1".to_owned()));
+        assert_eq!(tuple.0.get("b"), Some(&"2".to_owned()));
+
+        assert_eq!(tuple.1, 9);
+    }
+
+    #[test]
+    fn test_basic_command_with_envs() {
+        let c = "[a=1 b=2] go run main.go";
+        let parse_res = parse_project_command(c);
+
+        assert_eq!(parse_res.is_ok(), true);
+
+        assert_eq!(parse_res.as_ref().unwrap().get_program(), "go");
+
+        let first_env = parse_res.as_ref().unwrap().get_envs().nth(0).unwrap();
+        let second_env = parse_res.as_ref().unwrap().get_envs().nth(1).unwrap();
+        assert_eq!(first_env.0, "a");
+        assert_eq!(first_env.1.as_ref().unwrap(), &OsStr::new("1"));
+        assert_eq!(second_env.0, "b");
+        assert_eq!(second_env.1.as_ref().unwrap(), &OsStr::new("2"));
     }
 }

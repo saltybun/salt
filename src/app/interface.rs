@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 
 use crate::app::log;
+use crate::app::parser::parse_project_command;
 
 use super::ProjectDefinition;
 use super::{ProjectMap, SaltConfig};
@@ -150,8 +151,8 @@ fn parse_project_from_path(path: &PathBuf) -> Result<ProjectDefinition> {
 }
 
 fn is_project_a_intrinsic(project_name: &str) -> bool {
-    for iproject in INTRINSICS {
-        if iproject.0 == project_name || iproject.1 == project_name {
+    for i in INTRINSICS {
+        if i.0 == project_name || i.1 == project_name {
             return true;
         }
     }
@@ -629,12 +630,8 @@ impl Interface {
                     }
 
                     log!("running command: {}", &c.command);
-                    let splitted_cmd = c.command.split(' ').collect::<Vec<&str>>();
-                    let mut cmd = std::process::Command::new(splitted_cmd.first().unwrap());
-
-                    log!("running with args: {:?}", &splitted_cmd[1..]);
+                    let mut cmd = parse_project_command(&c.command)?;
                     cmd.envs(&self.env_vars);
-                    cmd.args(&splitted_cmd[1..]);
                     cmd.status()?;
                     return Ok(());
                 }
